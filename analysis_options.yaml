@@ -1,5 +1,11 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  errors:
+    # Flutter 3.47+ geçiş sürecindeki package:flutter/material.dart uyarısını yoksay;
+    # tüm gerçek hata, uyarı ve diğer lint kuralları sıkı biçimde zorunlu kalır.
+    deprecated_member_use: ignore
+
 linter:
   rules:
     prefer_const_constructors: true

@@ -180,7 +180,7 @@ jobs:
           flutter analyze 2>&1 | tee analyze.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            grep -E "(error|warning|info) •" analyze.log | head -40 | while IFS= read -r line; do
+            (grep -E "error •" analyze.log; grep -E "warning •" analyze.log; grep -E "info •" analyze.log) | head -40 | while IFS= read -r line; do
               echo "::error file=analyze.log::$line"
             done
             exit "$rc"
