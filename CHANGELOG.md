@@ -2,6 +2,14 @@
 
 Bu proje [Semantic Versioning](https://semver.org/) standartlarını takip eder.
 
+## [2.1.0] — 2026-11-22 (Google Play Store Uyum Sürümü)
+
+### Google Play Politika ve Teknik Uyumu
+- **Ön Plan Servisi (`FOREGROUND_SERVICE_DATA_SYNC`) Kaldırıldı:** Google Play 2026 ön plan servisi reddi riskini sıfırlamak için 7/24 çalışan `flutter_background_service` kaldırıldı; yerine işletim sistemi düzeyinde pil dostu yerel zamanlanmış bildirimler (`zonedSchedule` + `inexactAllowWhileIdle` + `ScheduledNotificationBootReceiver`) getirildi.
+- **Android 16 (`targetSdk = 36` / `compileSdk = 36`):** Google Play 2026 yeni uygulama API 36 zorunluluğu CI/Gradle hattında doğrudan sabitlendi.
+- **Google Play Mağaza Başvuru Paketi (`store/play_store/`):** Zorunlu `512×512` mağaza ikonu, `1024×500` öne çıkan grafik, 6 adet `1080×1920` telefon ekran görüntüsü ve kopyala-yapıştır Play Console başvuru rehberi eklendi.
+- **Canlı Çevrimdışı PWA Web Uygulaması:** `docs/app.html` (Android v2.0/v2.1 ile birebir JSON v2 uyumlu).
+
 ## [2.0.0] — 2026-11-22
 
 ### Yeni Özellikler

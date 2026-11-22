@@ -16,7 +16,8 @@
 4. **İnternet ve Sunucu Erişimi:** Uygulamanın herhangi bir uzak sunucusu, kullanıcı hesabı, reklam SDK'sı veya izleyici kütüphanesi yoktur.
 5. **Kullanıcı İzinleri:**
    - `POST_NOTIFICATIONS`: Yaklaşan yenileme ve deneme süresi hatırlatmalarını göstermek için.
-   - `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`: Uygulama kapalıyken veya cihaz yeniden başlatıldığında günlük hatırlatma kontrolünü sürdürmek için.
+   - `RECEIVE_BOOT_COMPLETED`: Cihaz yeniden başlatıldığında Android sistem zamanlayıcısındaki yerel hatırlatmaların kaybolmaması için.
+   *(Uygulama kalıcı ön plan servisi, konum, kamera, mikrofon veya rehber izni **istemez**.)*
 6. **Veri Kontrolü ve Silme:** Ayarlar ekranından tüm verilerinizi JSON/CSV/ICS olarak dışa aktarabilir veya uygulamayı kaldırdığınızda cihazdaki tüm yerel verilerin kalıcı olarak silinmesini sağlayabilirsiniz.
 7. **İletişim:** Gizlilikle ilgili sorularınız için GitHub deposu üzerinden iletişime geçebilirsiniz: `https://github.com/quantro11/AbonelikSistemi/issues`
 
@@ -30,6 +31,6 @@
 2. **Local Storage:** All subscriptions, payment logs, price history, budgets, and preferences are stored exclusively on your device using local SQLite storage and `SharedPreferences`.
 3. **PIN Lock Security:** When enabled, your 4-digit PIN is never stored in plaintext; it is hashed locally with SHA-256 and a per-device cryptographically random salt.
 4. **No Servers / No Trackers:** There is no backend server, account registration, advertising SDK, or third-party analytics library.
-5. **Device Permissions:** Android notification and foreground service permissions are used solely to deliver local renewal and free-trial expiration reminders.
+5. **Device Permissions:** Android `POST_NOTIFICATIONS` and `RECEIVE_BOOT_COMPLETED` permissions are used solely to deliver OS-scheduled local renewal and free-trial expiration reminders. No foreground service, location, camera, microphone, or contact permissions are requested.
 6. **Data Control & Deletion:** You can export your data anytime (JSON, CSV, ICS) or delete all local data permanently by uninstalling the app or clearing app storage.
 7. **Contact:** For privacy questions, open an issue at `https://github.com/quantro11/AbonelikSistemi/issues`.

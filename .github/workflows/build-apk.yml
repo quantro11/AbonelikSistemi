@@ -73,6 +73,14 @@ jobs:
           assert os.path.exists(p), 'Android app build.gradle(.kts) bulunamadi'
           s = open(p, encoding='utf-8').read()
 
+          # 0) Google Play 2026 Android 16 (API 36) targetSdk / compileSdk zorunlulugu
+          if p.endswith('.kts'):
+              s = re.sub(r'compileSdk\s*=\s*[^\n]+', 'compileSdk = 36', s)
+              s = re.sub(r'targetSdk\s*=\s*[^\n]+', 'targetSdk = 36', s)
+          else:
+              s = re.sub(r'compileSdk(?:Version)?\s+[^\n]+', 'compileSdk 36', s)
+              s = re.sub(r'targetSdk(?:Version)?\s+[^\n]+', 'targetSdk 36', s)
+
           # 1) Core library desugaring (flutter_local_notifications icin zorunlu)
           if p.endswith('.kts'):
               if 'isCoreLibraryDesugaringEnabled' not in s:

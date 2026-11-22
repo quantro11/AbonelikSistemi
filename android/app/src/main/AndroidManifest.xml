@@ -2,13 +2,8 @@
     <!-- Android 13+ yerel bildirim izni -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Arka plan servisinin cihaz yeniden başlatılınca çalışmaya devam etmesi -->
+    <!-- Cihaz yeniden başlatıldığında zamanlanmış hatırlatmaların korunması -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-
-    <!-- Arka plan servisi (flutter_background_service) izinleri -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 
     <application
         android:label="Abonelik Yöneticisi"
@@ -35,10 +30,20 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- flutter_background_service arka plan servisi kaydı -->
-        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="dataSync" />
+        <!-- Google Play uyumlu yerel zamanlanmış bildirim alıcıları (sıfır pil tüketimi) -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <!-- Ana ekran widget'ı (home_widget) kaydı -->
         <receiver

@@ -1,7 +1,7 @@
 /// Uygulama hakkında sabit bilgiler.
 class AppInfo {
   static const String appName = 'Abonelik Yöneticisi';
-  static const String version = '2.0.0';
+  static const String version = '2.1.0';
   static const String packageId = 'com.quantro.subscription_manager';
   static const String developer = 'Quantro (Faruk Hilmi Akpınar)';
   static const String repositoryUrl =

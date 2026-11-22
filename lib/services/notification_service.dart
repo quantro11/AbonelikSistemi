@@ -1,40 +1,76 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 import '../app_navigation.dart';
 import '../database/app_database.dart';
 import '../models/subscription.dart';
 
-/// Yerel bildirimler + arka plan (background) servisi.
+/// Zamanlanacak tek bir yerel bildirim görevi (birim testlerinde doğrulanır).
+class ScheduledAlert {
+  final int id;
+  final String title;
+  final String body;
+  final DateTime scheduledLocalTime;
+  final String payload;
+
+  const ScheduledAlert({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.scheduledLocalTime,
+    required this.payload,
+  });
+}
+
+/// Google Play uyumlu yerel zamanlanmış bildirim servisi.
 ///
-/// - `flutter_local_notifications`: cihaza bildirim gösterir.
-/// - `flutter_background_service`: uygulama kapalıyken bile çalışan bir
-///   arka plan isolate'i başlatır; periyodik olarak veritabanını kontrol
-///   eder ve yenilenmesine 3 gün veya daha az kalmış abonelikler için
-///   sabah ~09:00'da (ayarlanabilir) bildirim atar.
+/// Kalıcı ön plan servisi (`FOREGROUND_SERVICE_DATA_SYNC`) kullanmaz; bunun
+/// yerine işletim sisteminin doğal zamanlayıcısı (`inexactAllowWhileIdle`) ile
+/// yenileme ve deneme süresi bildirimlerini sıfır pil tüketimiyle zamanlar.
 class NotificationService {
-  static const int foregroundNotificationId = 999;
-  static const int renewalNotificationBaseId = 1000;
-  static const int trialNotificationBaseId = 2000;
+  static const int renewalNotificationBaseId = 10000;
+  static const int trialNotificationBaseId = 20000;
+  static const int _maxScheduledNotifications = 60;
 
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+
+  static bool _tzInitialized = false;
 
   static const AndroidNotificationChannel _renewalChannel =
       AndroidNotificationChannel(
     'renewal_alerts',
     'Yenileme Uyarıları',
-    description: 'Yaklaşan abonelik yenileme bildirimleri',
+    description: 'Yaklaşan abonelik yenileme ve deneme süresi bildirimleri',
     importance: Importance.high,
+  );
+
+  static const NotificationDetails _notificationDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'renewal_alerts',
+      'Yenileme Uyarıları',
+      channelDescription:
+          'Yaklaşan abonelik yenileme ve deneme süresi bildirimleri',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    ),
+    iOS: DarwinNotificationDetails(),
   );
 
   // ---------- Kurulum ----------
 
+  static void _ensureTimeZones() {
+    if (_tzInitialized) return;
+    tz_data.initializeTimeZones();
+    _tzInitialized = true;
+  }
+
   static Future<void> init() async {
+    _ensureTimeZones();
+
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(
       requestAlertPermission: false,
@@ -76,7 +112,7 @@ class NotificationService {
     openSubscriptionFromNotification(id);
   }
 
-  /// Android 13+ için çalışma zamanı izni.
+  /// Android 13+ için çalışma zamanı izni ister.
   static Future<void> requestNotificationPermission() async {
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -93,203 +129,161 @@ class NotificationService {
     return enabled ?? true;
   }
 
-  static Future<void> configureAndStartBackgroundService() async {
-    final service = FlutterBackgroundService();
+  // ---------- Saf Zamanlama Hesabı (Test Edilebilir) ----------
 
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: true,
-        autoStartOnBoot: true,
-        isForegroundMode: true,
-        foregroundServiceNotificationId: foregroundNotificationId,
-        foregroundServiceTypes: [AndroidForegroundType.dataSync],
-        initialNotificationTitle: 'Abonelik Takibi',
-        initialNotificationContent: 'Yenileme kontrolleri aktif',
-        notificationChannelId: _renewalChannel.id,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: true,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
+  /// Aktif abonelikler için zamanlanacak tüm yaklaşan yenileme ve deneme
+  /// bildirimlerini hesaplar.
+  static List<ScheduledAlert> computeScheduledAlerts(
+    List<Subscription> subscriptions, {
+    required int alertHour,
+    DateTime? now,
+  }) {
+    final current = now ?? DateTime.now();
+    final today = DateTime(current.year, current.month, current.day);
+    final alerts = <ScheduledAlert>[];
 
-    if (!await service.isRunning()) {
-      await service.startService();
-    }
-  }
+    for (final s in subscriptions) {
+      if (s.isCancelled || s.id == null) continue;
+      final subId = s.id!;
+      final symbol = CurrencyConverter.symbols[s.currency] ?? '';
 
-  static Future<void> stopBackgroundService() async {
-    final service = FlutterBackgroundService();
-    if (await service.isRunning()) {
-      service.invoke('stopService');
-    }
-  }
-
-  // ---------- Arka plan servisi ----------
-
-  @pragma('vm:entry-point')
-  static void onStart(ServiceInstance service) {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    if (service is AndroidServiceInstance) {
-      service.on('setAsForeground').listen((event) {
-        service.setAsForegroundService();
-      });
-      service.on('setAsBackground').listen((event) {
-        service.setAsBackgroundService();
-      });
-      service.on('stopService').listen((event) {
-        service.stopSelf();
-      });
-    }
-
-    // Servis başlar başlamaz ilk kontrol (saat şartına takılır).
-    performDailyCheck();
-
-    // Her 30 dakikada bir veritabanını kontrol et.
-    Timer.periodic(const Duration(minutes: 30), (timer) async {
-      // Ayarlardan bildirimler kapatılmışsa servisi kendisi durdurur.
-      final prefs = await SharedPreferences.getInstance();
-      if (!(prefs.getBool('notifications_enabled') ?? true)) {
-        if (service is AndroidServiceInstance) service.stopSelf();
-        return;
+      // 1) Yenileme hatırlatması: yenileme tarihinden `reminderDays` gün önce.
+      final renewalDate = s.nextRenewalDateFrom(today);
+      final reminderDay = renewalDate.subtract(Duration(days: s.reminderDays));
+      DateTime fireAt = DateTime(
+        reminderDay.year,
+        reminderDay.month,
+        reminderDay.day,
+        alertHour,
+      );
+      // Hatırlatma günü geçtiyse ama yenileme hâlâ bugün/gelecekteyse,
+      // bir sonraki uygun gün saatine (bugün saat geçmediyse bugün, geçtiyse yarın) planla.
+      if (!fireAt.isAfter(current)) {
+        final todayFire = DateTime(today.year, today.month, today.day, alertHour);
+        final candidate =
+            todayFire.isAfter(current) ? todayFire : todayFire.add(const Duration(days: 1));
+        final renewalEndOfDay =
+            DateTime(renewalDate.year, renewalDate.month, renewalDate.day, 23, 59);
+        if (!candidate.isAfter(renewalEndOfDay)) {
+          fireAt = candidate;
+        }
       }
 
-      await performDailyCheck();
+      if (fireAt.isAfter(current)) {
+        final fireDay = DateTime(fireAt.year, fireAt.month, fireAt.day);
+        final daysLeft = renewalDate.difference(fireDay).inDays;
+        final when = daysLeft <= 0
+            ? 'bugün'
+            : daysLeft == 1
+                ? 'yarın'
+                : '$daysLeft gün sonra';
+        alerts.add(ScheduledAlert(
+          id: renewalNotificationBaseId + subId,
+          title: 'Yenileme Uyarısı',
+          body: 'Dikkat: ${s.name} yenilemesine $when kaldı! '
+              '($symbol${s.price.toStringAsFixed(2)} ${s.currency})',
+          scheduledLocalTime: fireAt,
+          payload: 'renewal:$subId',
+        ));
+      }
 
-      if (service is AndroidServiceInstance) {
-        final now = DateTime.now();
-        service.setForegroundNotificationInfo(
-          title: 'Abonelik Takibi',
-          content: 'Son kontrol: '
-              '${now.hour}:${now.minute.toString().padLeft(2, '0')}',
+      // 2) Deneme süresi bitiş uyarısı: bitişten 3 gün önce.
+      final trialEnd = s.trialEndDate;
+      if (trialEnd != null) {
+        final trialDay = DateTime(trialEnd.year, trialEnd.month, trialEnd.day);
+        if (!trialDay.isBefore(today)) {
+          final trialRemind = trialDay.subtract(const Duration(days: 3));
+          DateTime trialFire = DateTime(
+            trialRemind.year,
+            trialRemind.month,
+            trialRemind.day,
+            alertHour,
+          );
+          if (!trialFire.isAfter(current)) {
+            final todayFire =
+                DateTime(today.year, today.month, today.day, alertHour);
+            final candidate = todayFire.isAfter(current)
+                ? todayFire
+                : todayFire.add(const Duration(days: 1));
+            final trialEndOfDay =
+                DateTime(trialDay.year, trialDay.month, trialDay.day, 23, 59);
+            if (!candidate.isAfter(trialEndOfDay)) {
+              trialFire = candidate;
+            }
+          }
+
+          if (trialFire.isAfter(current)) {
+            final fireDay =
+                DateTime(trialFire.year, trialFire.month, trialFire.day);
+            final daysLeft = trialDay.difference(fireDay).inDays;
+            final when = daysLeft <= 0
+                ? 'bugün'
+                : daysLeft == 1
+                    ? 'yarın'
+                    : '$daysLeft gün sonra';
+            alerts.add(ScheduledAlert(
+              id: trialNotificationBaseId + subId,
+              title: 'Deneme Süresi Uyarısı',
+              body: 'Dikkat: ${s.name} deneme süresi $when sona eriyor! '
+                  'İptal etmezseniz ücretlendirilir.',
+              scheduledLocalTime: trialFire,
+              payload: 'trial:$subId',
+            ));
+          }
+        }
+      }
+    }
+
+    alerts.sort((a, b) => a.scheduledLocalTime.compareTo(b.scheduledLocalTime));
+    if (alerts.length > _maxScheduledNotifications) {
+      return alerts.sublist(0, _maxScheduledNotifications);
+    }
+    return alerts;
+  }
+
+  // ---------- Zamanlama Senkronizasyonu ----------
+
+  /// Tüm bekleyen yerel bildirimleri iptal eder ve aktif aboneliklere göre
+  /// yeniden zamanlar. Veri her değiştiğinde güvenle çağrılabilir.
+  static Future<void> syncAllScheduledAlerts() async {
+    try {
+      _ensureTimeZones();
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('notifications_enabled') ?? true;
+
+      await _notifications.cancelAll();
+      if (!enabled) return;
+
+      final alertHour = prefs.getInt('alert_hour') ?? 9;
+      final active = await AppDatabase.instance.getActiveSubscriptions();
+      final alerts = computeScheduledAlerts(active, alertHour: alertHour);
+
+      for (final alert in alerts) {
+        final scheduledUtc =
+            tz.TZDateTime.from(alert.scheduledLocalTime.toUtc(), tz.UTC);
+        await _notifications.zonedSchedule(
+          alert.id,
+          alert.title,
+          alert.body,
+          scheduledUtc,
+          _notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: alert.payload,
         );
       }
-    });
-  }
-
-  @pragma('vm:entry-point')
-  static Future<bool> onIosBackground(ServiceInstance service) async {
-    WidgetsFlutterBinding.ensureInitialized();
-    await performDailyCheck();
-    return true;
-  }
-
-  // ---------- Günlük kontrol ----------
-
-  /// Sabah [alertHour] (varsayılan 09:00) saatinden sonra günde yalnızca
-  /// bir kez çalışır; her aboneliğin kendi [Subscription.reminderDays] ayarına
-  /// göre yaklaşan yenilemeler ve bitmesine 3 gün veya daha az kalan deneme
-  /// süreleri için bildirim gönderir.
-  static Future<void> performDailyCheck() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool('notifications_enabled') ?? true)) return;
-
-    final now = DateTime.now();
-    final alertHour = prefs.getInt('alert_hour') ?? 9;
-    final todayKey =
-        'last_daily_check_${now.year}-${now.month}-${now.day}';
-
-    // Henüz saat gelmediyse veya bugün zaten kontrol yapıldıysa çık.
-    if (now.hour < alertHour || (prefs.getBool(todayKey) ?? false)) return;
-    await prefs.setBool(todayKey, true);
-
-    final due = await AppDatabase.instance.getSubscriptionsDueForReminder();
-    for (final subscription in due) {
-      final lastNotified = subscription.lastNotifiedDate;
-      final alreadyNotifiedToday = lastNotified != null &&
-          lastNotified.year == now.year &&
-          lastNotified.month == now.month &&
-          lastNotified.day == now.day;
-      if (alreadyNotifiedToday) continue;
-
-      await showRenewalAlert(subscription);
-      await AppDatabase.instance
-          .updateLastNotifiedDate(subscription.id!, now);
-    }
-
-    await _checkTrialAlerts(now);
-  }
-
-  /// Bitmesine 3 gün veya daha az kalmış, aktif deneme süreleri için
-  /// günde bir kez bildirim gönderir.
-  static Future<void> _checkTrialAlerts(DateTime now) async {
-    final prefs = await SharedPreferences.getInstance();
-    final active = await AppDatabase.instance.getActiveSubscriptions();
-    final dueTrials = active.where((s) {
-      if (s.trialEndDate == null) return false;
-      final days = s.daysUntilTrialEnd;
-      return days >= 0 && days <= 3;
-    });
-
-    for (final subscription in dueTrials) {
-      final key = 'trial_notified_${subscription.id!}_'
-          '${now.year}-${now.month}-${now.day}';
-      if (prefs.getBool(key) ?? false) continue;
-
-      await showTrialEndAlert(subscription);
-      await prefs.setBool(key, true);
+    } catch (_) {
+      // Platform desteklemiyorsa (ör. test ortamı) uygulama akışı bozulmasın.
     }
   }
 
-  // ---------- Bildirim gösterimi ----------
-
-  static Future<void> showTrialEndAlert(Subscription subscription) async {
-    final days = subscription.daysUntilTrialEnd;
-    final when = days == 0
-        ? 'bugün'
-        : days == 1
-            ? 'yarın'
-            : '$days gün sonra';
-
-    await _notifications.show(
-      trialNotificationBaseId + (subscription.id ?? 0),
-      'Deneme Süresi Uyarısı',
-      'Dikkat: ${subscription.name} deneme süresi $when sona eriyor! '
-          'İptal etmezseniz ücretlendirilir.',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'renewal_alerts',
-          'Yenileme Uyarıları',
-          channelDescription: 'Yaklaşan abonelik yenileme bildirimleri',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      payload: 'trial:${subscription.id}',
-    );
-  }
-
-  static Future<void> showRenewalAlert(Subscription subscription) async {
-    final symbol = CurrencyConverter.symbols[subscription.currency] ?? '';
-    final days = subscription.daysUntilRenewal;
-    final when = days == 0
-        ? 'bugün'
-        : days == 1
-            ? 'yarın'
-            : '$days gün sonra';
-
-    await _notifications.show(
-      renewalNotificationBaseId + (subscription.id ?? 0),
-      'Yenileme Uyarısı',
-      'Dikkat: ${subscription.name} yenilemesine $when kaldı! '
-          '($symbol${subscription.price.toStringAsFixed(2)})',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'renewal_alerts',
-          'Yenileme Uyarıları',
-          channelDescription: 'Yaklaşan abonelik yenileme bildirimleri',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      payload: 'renewal:${subscription.id}',
-    );
+  /// Tüm zamanlanmış yerel bildirimleri iptal eder.
+  static Future<void> cancelAllScheduledAlerts() async {
+    try {
+      await _notifications.cancelAll();
+    } catch (_) {
+      // Yoksay.
+    }
   }
 }

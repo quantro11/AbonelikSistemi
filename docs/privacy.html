@@ -32,7 +32,7 @@
     <li><strong>Veri Toplama Yoktur:</strong> Hiçbir kişisel veri, finansal kayıt, cihaz kimliği, konum veya analitik bilgisi toplanmaz, sunucuya gönderilmez veya üçüncü taraflarla paylaşılmaz.</li>
     <li><strong>Yerel Depolama:</strong> Tüm abonelikler, ödemeler, fiyat geçmişi ve ayarlar yalnızca kendi cihazınızdaki yerel SQLite veritabanında ve uygulama tercihlerinde saklanır.</li>
     <li><strong>PIN Kilidi:</strong> Etkinleştirildiğinde 4 haneli PIN kodunuz rastgele tuzlu SHA-256 özeti olarak yalnızca cihazınızda saklanır; düz metin tutulmaz.</li>
-    <li><strong>İzinler:</strong> Bildirim ve arka plan servisi izinleri yalnızca yaklaşan abonelik yenileme ve deneme süresi hatırlatmalarını yerel olarak göstermek amacıyla kullanılır.</li>
+    <li><strong>İzinler:</strong> Yalnızca <code>POST_NOTIFICATIONS</code> ve <code>RECEIVE_BOOT_COMPLETED</code> izinleri, işletim sistemi tarafından zamanlanan yerel yenileme ve deneme süresi hatırlatmalarını göstermek için kullanılır. Ön plan servisi, konum, kamera, mikrofon veya rehber izni istenmez.</li>
     <li><strong>Veri Silme:</strong> Uygulama verilerini temizleyerek veya uygulamayı kaldırarak cihazınızdaki tüm kayıtları kalıcı olarak silebilirsiniz.</li>
   </ul>
 
@@ -44,7 +44,7 @@
     <li><strong>No Data Collection:</strong> We do not collect, store on external servers, sell, or share any personal, financial, location, or analytics data.</li>
     <li><strong>Local-Only Storage:</strong> All data remains strictly on your device in local SQLite storage and SharedPreferences.</li>
     <li><strong>PIN Protection:</strong> Optional 4-digit PIN codes are hashed locally using SHA-256 with a per-device random salt and are never stored in plaintext.</li>
-    <li><strong>Permissions:</strong> Notification and foreground service permissions are strictly used to trigger local renewal and free-trial expiration reminders.</li>
+    <li><strong>Permissions:</strong> Only <code>POST_NOTIFICATIONS</code> and <code>RECEIVE_BOOT_COMPLETED</code> are used to deliver OS-scheduled local renewal and free-trial reminders. No foreground service, location, camera, or contacts permissions are requested.</li>
     <li><strong>Contact:</strong> <a href="https://github.com/quantro11/AbonelikSistemi/issues">GitHub Issues</a></li>
   </ul>
 </body>

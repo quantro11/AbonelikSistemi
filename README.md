@@ -1,15 +1,17 @@
-# Abonelik Yöneticisi (`AbonelikSistemi` v2.0)
+# Abonelik Yöneticisi (`AbonelikSistemi` v2.1)
 
 [![Build & Release](https://github.com/quantro11/AbonelikSistemi/actions/workflows/build-apk.yml/badge.svg)](https://github.com/quantro11/AbonelikSistemi/actions/workflows/build-apk.yml)
 [![Latest Release](https://img.shields.io/github/v/release/quantro11/AbonelikSistemi?label=S%C3%BCr%C3%BCm)](https://github.com/quantro11/AbonelikSistemi/releases/latest)
+[![Google Play Ready](https://img.shields.io/badge/Google%20Play-API%2036%20Haz%C4%B1r-34a853.svg)](store/play_store/PLAY_CONSOLE_BASVURU_PAKETI.md)
 [![License: AGPL v3](https://img.shields.io/badge/Lisans-AGPL--3.0-blue.svg)](LICENSE)
 [![Offline First](https://img.shields.io/badge/%C3%87evrimd%C4%B1%C5%9F%C4%B1-%25100%20Yerel-22c55e.svg)](PRIVACY_POLICY.md)
 
-Tamamen **çevrimdışı (offline)**, sunucusuz, reklamsız ve gizlilik öncelikli **Kişisel Finans ve Abonelik Yönetimi** uygulaması (Flutter + SQLite).  
+Tamamen **çevrimdışı (offline)**, sunucusuz, reklamsız ve gizlilik öncelikli **Kişisel Finans ve Abonelik Yönetimi** uygulaması (Flutter + SQLite • `targetSdk 36` Google Play Store uyumlu).  
 Paket kimliği: `com.quantro.subscription_manager`
 
-> **Android İndir (`v2.0.0`):** [Doğrudan APK & Google Play AAB Release Sayfası](https://github.com/quantro11/AbonelikSistemi/releases/latest)  
-> **Canlı Web Uygulaması (PWA):** `docs/app.html` — Android ile birebir uyumlu JSON v2 yedekleme, 16 şablon, PIN kilidi, zam analizi ve 12 aylık projeksiyon (Vercel `vercel.json` + GitHub Pages hazır)  
+> **Android İndir (`v2.1.0`):** [Doğrudan APK & Google Play AAB Release Sayfası](https://github.com/quantro11/AbonelikSistemi/releases/latest)  
+> **Google Play Mağaza Paketi:** [store/play_store/PLAY_CONSOLE_BASVURU_PAKETI.md](store/play_store/PLAY_CONSOLE_BASVURU_PAKETI.md) (`512×512` ikon, `1024×500` öne çıkan grafik, 6 adet `1080×1920` ekran görüntüsü ve tüm form metinleri)  
+> **Canlı Web Uygulaması (PWA):** `docs/app.html` — Android ile birebir uyumlu JSON v2 yedekleme (Vercel `vercel.json` + GitHub Pages hazır)  
 > **Gizlilik Politikası:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md) • **Yayınlama Rehberi:** [docs/RELEASE_GUIDE.md](docs/RELEASE_GUIDE.md) • **Değişiklik Günlüğü:** [CHANGELOG.md](CHANGELOG.md)
 
 ---
@@ -93,7 +95,7 @@ flutter build apk --release
 flutter build appbundle --release
 ```
 
-> **Android Arka Plan Notu:** `AndroidManifest.xml` içindeki `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` ve `FOREGROUND_SERVICE_DATA_SYNC` izinleri yalnızca yerel yenileme bildirimleri içindir. Kesintisiz arka plan hatırlatması için cihaz pil ayarlarından uygulamanın pil optimizasyonundan muaf tutulması önerilir.
+> **Google Play Politika & Pil Dostu Mimari:** `v2.1.0` ile kalıcı ön plan servisi (`FOREGROUND_SERVICE_DATA_SYNC`) tamamen kaldırıldı; hatırlatmalar Android'in doğal zamanlayıcısıyla (`POST_NOTIFICATIONS` + `RECEIVE_BOOT_COMPLETED`) sıfır pil tüketimiyle çalışır ve `targetSdk 36` (Android 16) ile Google Play Store gereksinimlerini %100 karşılar.
 
 ---
 

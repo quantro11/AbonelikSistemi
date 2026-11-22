@@ -99,14 +99,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setBool('notifications_enabled', enabled);
     if (mounted) setState(() => _notificationsEnabled = enabled);
 
-    try {
-      if (enabled) {
-        await NotificationService.configureAndStartBackgroundService();
-      } else {
-        await NotificationService.stopBackgroundService();
-      }
-    } catch (_) {
-      // Servis yönetimi başarısız olursa uygulama akışı bozulmasın.
+    if (enabled) {
+      await NotificationService.syncAllScheduledAlerts();
+    } else {
+      await NotificationService.cancelAllScheduledAlerts();
     }
   }
 
@@ -114,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('alert_hour', hour);
     if (mounted) setState(() => _alertHour = hour);
+    await NotificationService.syncAllScheduledAlerts();
   }
 
   Future<void> _setThemeMode(ThemeMode mode) async {
@@ -185,6 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await ExportService.restoreBackupData(data, replace: choice == 'replace');
       unawaited(WidgetService.updateUpcoming());
+      unawaited(NotificationService.syncAllScheduledAlerts());
       HapticFeedback.mediumImpact();
       messenger.showSnackBar(
         const SnackBar(content: Text('Yedek başarıyla geri yüklendi.')),
@@ -351,6 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final result = await ExportService.importCsvData(data);
       unawaited(WidgetService.updateUpcoming());
+      unawaited(NotificationService.syncAllScheduledAlerts());
       HapticFeedback.mediumImpact();
       messenger.showSnackBar(
         SnackBar(
@@ -624,7 +623,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       SwitchListTile(
                         title: const Text('Yenileme bildirimleri'),
-                        subtitle: const Text('Arka plan servisini etkinleştir'),
+                        subtitle: const Text(
+                          'Sistem zamanlayıcısı ile pil dostu yerel hatırlatma',
+                        ),
                         value: _notificationsEnabled,
                         onChanged: _setNotificationsEnabled,
                       ),
@@ -632,7 +633,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ListTile(
                           title: const Text('Bildirim saati'),
                           subtitle: const Text(
-                            'Her gün bu saatten sonra ilk kontrol yapılır.',
+                            'Yaklaşan hatırlatmalar bu saatte gönderilir.',
                           ),
                           trailing: DropdownButton<int>(
                             value: _alertHour,
@@ -775,9 +776,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Android cihazlarda arka plan kontrolünün '
-                            'kesintisiz çalışması için uygulamayı pil '
-                            'optimizasyonundan muaf tutmanız önerilir.',
+                            'Hatırlatmalar Android sistem zamanlayıcısıyla '
+                            'çalışır; arka planda sürekli servis çalıştırmadığı '
+                            'için pil tüketmez ve cihaz yeniden başlatılsa bile '
+                            'korunur.',
                             style: TextStyle(
                               fontSize: 12,
                               color: Theme.of(context)

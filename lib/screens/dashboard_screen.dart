@@ -126,8 +126,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loading = false;
     });
 
-    // Ana ekran widget'ını yaklaşan yenilemelerle tazele (kritik değil).
+    // Ana ekran widget'ını ve zamanlanmış yerel bildirimleri tazele.
     unawaited(WidgetService.updateUpcoming());
+    unawaited(NotificationService.syncAllScheduledAlerts());
   }
 
   List<Subscription> get _filtered {

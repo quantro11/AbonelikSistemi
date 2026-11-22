@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_navigation.dart';
 import 'models/subscription.dart';
@@ -12,17 +11,9 @@ import 'theme/theme_controller.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Yerel bildirimlerin kurulumu.
+  // Yerel bildirimlerin kurulumu ve yaklaşan hatırlatmaların zamanlanması.
   await NotificationService.init();
-
-  // Bildirimler açıksa arka plan servisini başlat
-  // (uygulama kapalıyken bile günlük kontrol yapılır).
-  final prefs = await SharedPreferences.getInstance();
-  final notificationsEnabled =
-      prefs.getBool('notifications_enabled') ?? true;
-  if (notificationsEnabled) {
-    await NotificationService.configureAndStartBackgroundService();
-  }
+  await NotificationService.syncAllScheduledAlerts();
 
   // Kaydedilmiş tema, döviz kuru ve PIN kilidi tercihlerini yükle.
   await ThemeController.instance.load();
