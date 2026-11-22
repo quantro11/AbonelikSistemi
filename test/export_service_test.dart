@@ -185,7 +185,7 @@ void main() {
   });
 
   test('parseCsv abonelik CSV satırlarını çözer', () {
-    final csv = 'id,name,price,currency,billing_cycle,start_date,status,'
+    const csv = 'id,name,price,currency,billing_cycle,start_date,status,'
         'category,trial_end_date,reminder_days,next_renewal_date,'
         'days_until_renewal,monthly_equivalent\n'
         '1,Netflix,100,TRY,monthly,2026-01-15,active,video,,3,'
@@ -207,7 +207,7 @@ void main() {
   });
 
   test('parseCsv ödeme CSV satırlarını çözer', () {
-    final csv = 'subscription_name,amount,currency,paid_at,note\n'
+    const csv = 'subscription_name,amount,currency,paid_at,note\n'
         'Netflix,100,TRY,2026-07-20T10:00:00.000,"Aylık, ödeme"\n';
 
     final data = ExportService.parseCsv(csv);

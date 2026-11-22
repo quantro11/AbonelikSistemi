@@ -187,7 +187,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: PopularTemplates.all.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final t = PopularTemplates.all[index];
               final cat = CategoryCatalog.byKey(t.category);

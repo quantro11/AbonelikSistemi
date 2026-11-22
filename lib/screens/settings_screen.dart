@@ -377,10 +377,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       applicationVersion: AppInfo.version,
       applicationLegalese: '© ${AppInfo.developer} • AGPL-3.0',
       applicationIcon: const Icon(Icons.subscriptions_outlined, size: 40),
-      children: [
+      children: const [
         Text(AppInfo.description),
-        const SizedBox(height: 12),
-        const Text(
+        SizedBox(height: 12),
+        Text(
           'Özellikler:\n'
           '• Tek dokunuşla popüler servis şablonları\n'
           '• 4 haneli yerel PIN uygulama kilidi (SHA-256)\n'
@@ -801,8 +801,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.subscriptions_outlined),
-                        title: Text(AppInfo.appName),
-                        subtitle: Text('Sürüm ${AppInfo.version}'),
+                        title: const Text(AppInfo.appName),
+                        subtitle: const Text('Sürüm ${AppInfo.version}'),
                         trailing: const Icon(Icons.info_outline),
                         onTap: _showAbout,
                       ),

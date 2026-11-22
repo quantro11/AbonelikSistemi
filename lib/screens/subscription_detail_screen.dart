@@ -666,7 +666,7 @@ class _PriceChartPainter extends CustomPainter {
     final minValue = values.reduce(math.min);
     final maxValue = values.reduce(math.max);
     final range = (maxValue - minValue) == 0 ? 1.0 : maxValue - minValue;
-    final padding = 4.0;
+    const padding = 4.0;
     final width = size.width - padding * 2;
     final height = size.height - padding * 2;
 
