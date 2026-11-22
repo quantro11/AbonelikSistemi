@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../database/app_database.dart';
 import '../models/payment.dart';
+import '../models/price_history.dart';
 import '../models/subscription.dart';
 
 /// CSV / JSON yedek ve ICS takvim dışa aktarma + geri yükleme.
@@ -304,7 +305,7 @@ class ExportService {
         skippedPayments++;
         continue;
       }
-      final key = '${id}|${p.amount.toStringAsFixed(2)}|'
+      final key = '$id|${p.amount.toStringAsFixed(2)}|'
           '${p.paidAt.year}-${p.paidAt.month}-${p.paidAt.day}';
       if (paymentKeys.contains(key)) {
         skippedPayments++;
@@ -331,20 +332,22 @@ class ExportService {
 
   // ---------- JSON yedekleme ----------
 
-  /// Tüm veriyi (abonelikler + ödemeler) JSON olarak oluşturur.
+  /// Tüm veriyi (abonelikler + ödemeler + fiyat geçmişi) JSON olarak oluşturur.
   static Future<String> buildBackupJson() async {
     final subscriptions = await AppDatabase.instance.getSubscriptions();
     final payments = await AppDatabase.instance.getAllPayments();
+    final priceHistory = await AppDatabase.instance.getAllPriceHistory();
     return jsonEncode({
       'app': 'subscription_manager',
-      'version': 1,
+      'version': 2,
       'exported_at': DateTime.now().toIso8601String(),
       'subscriptions': subscriptions.map((s) => s.toMap()).toList(),
       'payments': payments.map((p) => p.toMap()).toList(),
+      'price_history': priceHistory.map((h) => h.toMap()).toList(),
     });
   }
 
-  /// Yedek JSON'u çözümler. Hatalı/eksik formatlarda sağlam davranır.
+  /// Yedek JSON'u çözümler. v1 (fiyat geçmişi olmayan) ve v2 yedeklerle uyumludur.
   static BackupData parseBackupJson(String jsonString) {
     final decoded = jsonDecode(jsonString);
     if (decoded is! Map<String, dynamic>) {
@@ -362,7 +365,16 @@ class ExportService {
       if (item is! Map) continue;
       payments.add(Payment.fromMap(item.cast<String, dynamic>()));
     }
-    return BackupData(subscriptions: subscriptions, payments: payments);
+    final priceHistory = <PriceHistory>[];
+    for (final item in decoded['price_history'] as List<dynamic>? ?? const []) {
+      if (item is! Map) continue;
+      priceHistory.add(PriceHistory.fromMap(item.cast<String, dynamic>()));
+    }
+    return BackupData(
+      subscriptions: subscriptions,
+      payments: payments,
+      priceHistory: priceHistory,
+    );
   }
 
   /// Yedek dosyasını paylaşım menüsüyle verir.
@@ -398,9 +410,18 @@ class ExportService {
   }) async {
     if (replace) await AppDatabase.instance.deleteAllData();
 
+    final historySubIds = {
+      for (final h in data.priceHistory) h.subscriptionId,
+    };
+
     final idMap = <int, int>{};
     for (final sub in data.subscriptions) {
-      final newId = await AppDatabase.instance.insertSubscription(sub);
+      final hasExplicitHistory =
+          sub.id != null && historySubIds.contains(sub.id);
+      final newId = await AppDatabase.instance.insertSubscription(
+        sub,
+        recordInitialPriceHistory: !hasExplicitHistory,
+      );
       if (sub.id != null) idMap[sub.id!] = newId;
     }
     for (final payment in data.payments) {
@@ -413,6 +434,18 @@ class ExportService {
           currency: payment.currency,
           paidAt: payment.paidAt,
           note: payment.note,
+        ),
+      );
+    }
+    for (final entry in data.priceHistory) {
+      final mappedId = idMap[entry.subscriptionId];
+      if (mappedId == null) continue;
+      await AppDatabase.instance.insertPriceHistory(
+        PriceHistory(
+          subscriptionId: mappedId,
+          price: entry.price,
+          currency: entry.currency,
+          changedAt: entry.changedAt,
         ),
       );
     }
@@ -469,8 +502,13 @@ class ExportService {
 class BackupData {
   final List<Subscription> subscriptions;
   final List<Payment> payments;
+  final List<PriceHistory> priceHistory;
 
-  const BackupData({required this.subscriptions, required this.payments});
+  const BackupData({
+    required this.subscriptions,
+    required this.payments,
+    this.priceHistory = const [],
+  });
 }
 
 /// Çözümlenmiş CSV verisi (abonelik ve/veya ödeme satırları).

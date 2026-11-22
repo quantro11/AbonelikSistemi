@@ -25,9 +25,12 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+enum _SortOrder { renewal, priceDesc, nameAsc }
+
 class _DashboardScreenState extends State<DashboardScreen> {
   final NumberFormat _amountFormat =
       NumberFormat.currency(symbol: '', decimalDigits: 2);
+  final TextEditingController _searchController = TextEditingController();
 
   List<Subscription> _subscriptions = const [];
   Map<String, double> _totalsByCurrency = const {};
@@ -35,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _displayCurrency = 'TRY';
   String? _categoryFilter;
   String _searchQuery = '';
+  _SortOrder _sortOrder = _SortOrder.renewal;
   double _monthlyBudget = 0;
   bool _notificationsDisabled = false;
   bool _loading = true;
@@ -45,6 +49,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadData();
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _maybeShowWelcome());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   /// İlk açılışta bir kez gösterilen kısa tanıtım penceresi.
@@ -61,11 +71,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Abonelik Yöneticisine Hoş Geldiniz'),
         content: const Text(
           'Tüm aboneliklerinizi tek yerden takip edin:\n'
+          '• Tek dokunuşla popüler servis şablonları\n'
           '• Yenileme ve deneme süresi hatırlatmaları\n'
           '• Aylık bütçe ilerlemesi ve aşım uyarısı\n'
-          '• Fiyat geçmişi ve artış grafiği\n'
+          '• Fiyat geçmişi, zam analizi ve 12 aylık projeksiyon\n'
+          '• 4 haneli yerel PIN uygulama kilidi\n'
           '• Yenileme takvimi ve ana ekran widget\'ı\n'
-          '• Ödeme geçmişi ve gerçek harcama analizi\n'
           '• JSON yedekleme, CSV ve takvim aktarımı\n\n'
           'Uygulama tamamen çevrimdışı çalışır; verileriniz '
           'cihazınızda kalır.',
@@ -121,7 +132,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<Subscription> get _filtered {
     final query = _searchQuery.trim().toLowerCase();
-    return _subscriptions.where((s) {
+    final list = _subscriptions.where((s) {
       final inCategory =
           _categoryFilter == null || s.category == _categoryFilter;
       if (!inCategory) return false;
@@ -130,6 +141,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           s.category.toLowerCase().contains(query) ||
           s.currency.toLowerCase().contains(query);
     }).toList();
+
+    list.sort((a, b) {
+      if (a.isCancelled != b.isCancelled) return a.isCancelled ? 1 : -1;
+      switch (_sortOrder) {
+        case _SortOrder.renewal:
+          return a.nextRenewalDate.compareTo(b.nextRenewalDate);
+        case _SortOrder.priceDesc:
+          final pa = CurrencyConverter.convert(
+            a.monthlyEquivalent,
+            a.currency,
+            _displayCurrency,
+          );
+          final pb = CurrencyConverter.convert(
+            b.monthlyEquivalent,
+            b.currency,
+            _displayCurrency,
+          );
+          return pb.compareTo(pa);
+        case _SortOrder.nameAsc:
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      }
+    });
+    return list;
   }
 
   Future<void> _openAddScreen() async {
@@ -286,13 +320,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Abonelikler',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      if (_categoryFilter != null)
-                        TextButton(
-                          onPressed: () {
-                            setState(() => _categoryFilter = null);
-                          },
-                          child: const Text('Filtreyi Kaldır'),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_categoryFilter != null)
+                            TextButton(
+                              onPressed: () {
+                                setState(() => _categoryFilter = null);
+                              },
+                              child: const Text('Filtreyi Kaldır'),
+                            ),
+                          PopupMenuButton<_SortOrder>(
+                            tooltip: 'Sırala',
+                            initialValue: _sortOrder,
+                            icon: const Icon(Icons.sort),
+                            onSelected: (value) {
+                              setState(() => _sortOrder = value);
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: _SortOrder.renewal,
+                                child: Text('Yaklaşan yenileme'),
+                              ),
+                              PopupMenuItem(
+                                value: _SortOrder.priceDesc,
+                                child: Text('En yüksek fiyat'),
+                              ),
+                              PopupMenuItem(
+                                value: _SortOrder.nameAsc,
+                                child: Text('İsme göre (A-Z)'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -386,6 +447,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSearchField() {
     return TextField(
+      controller: _searchController,
       onChanged: (value) => setState(() => _searchQuery = value),
       decoration: InputDecoration(
         hintText: 'Abonelik ara...',
@@ -400,7 +462,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? null
             : IconButton(
                 icon: const Icon(Icons.clear),
-                onPressed: () => setState(() => _searchQuery = ''),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
               ),
       ),
     );

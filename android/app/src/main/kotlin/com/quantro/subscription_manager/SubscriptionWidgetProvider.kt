@@ -1,4 +1,4 @@
-package com.anomalyco.subscription_manager
+package com.quantro.subscription_manager
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
 import '../models/categories.dart';
+import '../models/popular_templates.dart';
 import '../models/subscription.dart';
 
 /// Yeni abonelik ekleme / mevcut aboneliği düzenleme formu.
@@ -144,7 +145,11 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
           ],
         ),
       );
-      if (proceed != true || !mounted) return;
+      if (proceed != true) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
+      if (!mounted) return;
     }
 
     if (_isEditing) {
@@ -154,6 +159,49 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);
+  }
+
+  void _applyTemplate(SubscriptionTemplate template) {
+    setState(() {
+      _nameController.text = template.name;
+      _priceController.text = template.defaultPrice.toStringAsFixed(2);
+      _currency = template.currency;
+      _billingCycle = template.billingCycle;
+      _category = template.category;
+    });
+  }
+
+  Widget _buildQuickTemplates() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hızlı Şablonlar',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: PopularTemplates.all.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final t = PopularTemplates.all[index];
+              final cat = CategoryCatalog.byKey(t.category);
+              return ActionChip(
+                avatar: Icon(cat.icon, size: 18, color: cat.color),
+                label: Text(t.name),
+                onPressed: () => _applyTemplate(t),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
   }
 
   @override
@@ -169,6 +217,7 @@ class _AddSubscriptionScreenState extends State<AddSubscriptionScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (!_isEditing) _buildQuickTemplates(),
             TextFormField(
               controller: _nameController,
               textCapitalization: TextCapitalization.sentences,

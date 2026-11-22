@@ -266,4 +266,25 @@ void main() {
     expect(subs.map((s) => s.name), containsAll(['Netflix', 'Spotify']));
     expect(await db.getAllPayments(), hasLength(2));
   });
+
+  test('buildBackupJson v2 fiyat geçmişini yedekler ve geri yükler', () async {
+    final db = AppDatabase.instance;
+    final id = await db.insertSubscription(makeSub(name: 'Netflix', price: 100));
+    await db.updateSubscription(makeSub(id: id, name: 'Netflix', price: 180));
+
+    final json = await ExportService.buildBackupJson();
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    expect(decoded['version'], 2);
+    expect(decoded['price_history'], hasLength(2));
+
+    final parsed = ExportService.parseBackupJson(json);
+    expect(parsed.priceHistory, hasLength(2));
+
+    await ExportService.restoreBackupData(parsed, replace: true);
+    final restoredSub = (await db.getSubscriptions()).single;
+    final restoredHistory =
+        await db.getPriceHistoryForSubscription(restoredSub.id!);
+    expect(restoredHistory, hasLength(2));
+    expect(restoredHistory.map((h) => h.price).toList(), [100, 180]);
+  });
 }

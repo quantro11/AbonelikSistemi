@@ -4,7 +4,7 @@ description: >-
   Yönetimi uygulaması. SQLite yerel veritabanı, yerel bildirimler ve
   arka plan servisi içerir.
 publish_to: 'none'
-version: 1.2.0+3
+version: 2.0.0+4
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -13,6 +13,9 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+
+  # PIN kilidi için yerel SHA-256 özetleme
+  crypto: ^3.0.3
 
   # Yerel veritabanı (SQLite)
   sqflite: ^2.3.3

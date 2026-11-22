@@ -36,6 +36,11 @@ android/.gradle/
 android/local.properties
 android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 
-# CI paketleme çıktısı
+# CI paketleme çıktısı ve imzalama anahtarları
 *.zip
-app-release.apk
+*.apk
+*.aab
+*.jks
+*.keystore
+android/key.properties
+release-assets/

@@ -41,6 +41,22 @@ void main() {
       expect(next.day, 10);
       expect(next.isBefore(DateTime.now()), isFalse);
     });
+
+    test('ay sonu taşması olmadan 31 Ocak -> 28/29 Şubat sabitlenir', () {
+      final s = _subscription(
+        startDate: DateTime(2025, 1, 31),
+        billingCycle: 'monthly',
+      );
+      expect(
+        s.nextRenewalDateFrom(DateTime(2025, 2, 1)),
+        DateTime(2025, 2, 28),
+      );
+      // Artık yılda 29 Şubat
+      expect(
+        s.nextRenewalDateFrom(DateTime(2028, 2, 1)),
+        DateTime(2028, 2, 29),
+      );
+    });
   });
 
   group('Subscription.daysUntilRenewal', () {

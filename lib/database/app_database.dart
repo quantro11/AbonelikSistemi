@@ -122,7 +122,10 @@ class AppDatabase {
 
   // ---------- CREATE ----------
 
-  Future<int> insertSubscription(Subscription subscription) async {
+  Future<int> insertSubscription(
+    Subscription subscription, {
+    bool recordInitialPriceHistory = true,
+  }) async {
     final db = await database;
     final id = await db.insert('subscriptions', {
       'name': subscription.name,
@@ -135,7 +138,7 @@ class AppDatabase {
       'trial_end_date': subscription.trialEndDate?.toIso8601String(),
       'reminder_days': subscription.reminderDays,
     });
-    if (id != 0) {
+    if (id != 0 && recordInitialPriceHistory) {
       // İlk fiyat kaydını at; geçmiş grafiği bunun üzerine kurulur.
       await insertPriceHistory(PriceHistory(
         subscriptionId: id,
@@ -183,6 +186,16 @@ class AppDatabase {
     final subscriptions = await getActiveSubscriptions();
     return subscriptions
         .where((s) => s.daysUntilRenewal <= withinDays)
+        .toList()
+      ..sort((a, b) => a.daysUntilRenewal.compareTo(b.daysUntilRenewal));
+  }
+
+  /// Her aboneliğin kendi [Subscription.reminderDays] ayarına göre
+  /// bildirim zamanı gelmiş **aktif** abonelikler.
+  Future<List<Subscription>> getSubscriptionsDueForReminder() async {
+    final subscriptions = await getActiveSubscriptions();
+    return subscriptions
+        .where((s) => s.daysUntilRenewal <= s.reminderDays)
         .toList()
       ..sort((a, b) => a.daysUntilRenewal.compareTo(b.daysUntilRenewal));
   }
@@ -338,6 +351,16 @@ class AppDatabase {
       'price_history',
       where: 'subscription_id = ?',
       whereArgs: [subscriptionId],
+      orderBy: 'changed_at ASC, id ASC',
+    );
+    return rows.map(PriceHistory.fromMap).toList();
+  }
+
+  /// Tüm aboneliklerin fiyat geçmişi (yedekleme ve zam analizi için).
+  Future<List<PriceHistory>> getAllPriceHistory() async {
+    final db = await database;
+    final rows = await db.query(
+      'price_history',
       orderBy: 'changed_at ASC, id ASC',
     );
     return rows.map(PriceHistory.fromMap).toList();

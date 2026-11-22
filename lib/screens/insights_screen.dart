@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../database/app_database.dart';
 import '../models/categories.dart';
 import '../models/payment.dart';
+import '../models/price_history.dart';
 import '../models/subscription.dart';
+import '../services/analytics_service.dart';
 
 /// İstatistik ekranı: yıllık/aylık toplam, yaklaşan ödemeler ve
 /// kategori bazında harcama dökümü (donut grafik).
@@ -28,6 +30,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
   double _monthlyBudget = 0;
   List<Subscription> _active = const [];
   List<Payment> _payments = const [];
+  List<PriceHistory> _priceHistory = const [];
   bool _loading = true;
 
   @override
@@ -43,6 +46,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final monthly =
         await AppDatabase.instance.getMonthlyTotal(displayCurrency: currency);
     final payments = await AppDatabase.instance.getAllPayments();
+    final priceHistory = await AppDatabase.instance.getAllPriceHistory();
 
     if (!mounted) return;
     setState(() {
@@ -52,6 +56,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       _yearlyTotal = monthly * 12;
       _monthlyBudget = prefs.getDouble('monthly_budget') ?? 0;
       _payments = payments;
+      _priceHistory = priceHistory;
       _loading = false;
     });
   }
@@ -127,6 +132,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   _buildTopCard(),
                   const SizedBox(height: 24),
                   _buildUpcomingCard(),
+                  const SizedBox(height: 24),
+                  _buildPriceIncreaseCard(),
+                  const SizedBox(height: 24),
+                  _buildProjectionCard(),
                   const SizedBox(height: 24),
                   _buildCategoryCard(),
                   const SizedBox(height: 24),
@@ -250,11 +259,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   Widget _buildUpcomingCard() {
     final next7 = _upcomingInDays(7);
-    final symbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
+    final displaySymbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
     var total7 = 0.0;
     for (final s in next7) {
       total7 += CurrencyConverter.convert(
-        s.monthlyEquivalent,
+        s.price,
         s.currency,
         _displayCurrency,
       );
@@ -283,7 +292,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       '${s.daysUntilRenewal == 0 ? 'bugün' : '${s.daysUntilRenewal} gün'}',
                     ),
                     trailing: Text(
-                      '$symbol${s.price.toStringAsFixed(2)} ${s.currency}',
+                      '${CurrencyConverter.symbols[s.currency] ?? ''}'
+                      '${s.price.toStringAsFixed(2)} ${s.currency}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -296,10 +306,177 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       style: TextStyle(color: Colors.grey.shade700),
                     ),
                     Text(
-                      '$symbol${_amountFormat.format(total7)} $_displayCurrency',
+                      '$displaySymbol${_amountFormat.format(total7)} $_displayCurrency',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ],
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildPriceIncreaseCard() {
+    final alerts = AnalyticsService.computePriceIncreases(
+      activeSubscriptions: _active,
+      allPriceHistory: _priceHistory,
+      displayCurrency: _displayCurrency,
+    );
+    final displaySymbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _sectionCard(
+      title: 'Zam Analizi (Fiyat Artışları)',
+      child: alerts.isEmpty
+          ? Text(
+              'Fiyat artışı tespit edilen aktif abonelik yok. Bir aboneliğin '
+              'fiyatını güncellediğinizde artış oranı burada otomatik hesaplanır.',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            )
+          : Column(
+              children: [
+                for (final a in alerts)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: colorScheme.errorContainer,
+                      child: Icon(
+                        Icons.trending_up,
+                        size: 18,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    title: Text(a.subscription.name),
+                    subtitle: Text(
+                      '${CurrencyConverter.symbols[a.subscription.currency] ?? ''}'
+                      '${a.initialPrice.toStringAsFixed(2)} → '
+                      '${CurrencyConverter.symbols[a.subscription.currency] ?? ''}'
+                      '${a.currentPrice.toStringAsFixed(2)} '
+                      '${a.subscription.currency}',
+                    ),
+                    trailing: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '+%${a.percentChange.toStringAsFixed(1)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.error,
+                          ),
+                        ),
+                        Text(
+                          '+$displaySymbol${_amountFormat.format(a.extraYearlyCostDisplay)}/yıl',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildProjectionCard() {
+    final projection = AnalyticsService.computeMonthlyProjection(
+      activeSubscriptions: _active,
+      displayCurrency: _displayCurrency,
+      months: 12,
+    );
+    final displaySymbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
+    final total12 = projection.fold<double>(0, (sum, m) => sum + m.amount);
+    final maxAmount =
+        projection.fold<double>(0, (maxVal, m) => math.max(maxVal, m.amount));
+
+    return _sectionCard(
+      title: '12 Aylık Ödeme Projeksiyonu',
+      child: _active.isEmpty
+          ? Text(
+              'Projeksiyon için en az bir aktif abonelik ekleyin.',
+              style: TextStyle(color: Colors.grey.shade600),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final m in projection)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 78,
+                          child: Text(
+                            '${_trMonths[m.month - 1].substring(0, 3)} ${m.year % 100}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                              if (m.amount > 0)
+                                FractionallySizedBox(
+                                  widthFactor:
+                                      maxAmount == 0 ? 0 : m.amount / maxAmount,
+                                  child: Container(
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .tertiary,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        SizedBox(
+                          width: 88,
+                          child: Text(
+                            '$displaySymbol${_amountFormat.format(m.amount)}',
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '12 aylık nakit çıkışı',
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      '$displaySymbol${_amountFormat.format(total12)} $_displayCurrency',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Yıllık abonelikler yenilendikleri ayda tam tutarlarıyla yansır.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -463,7 +640,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
                           child: Text(
                             '$symbol${_amountFormat.format(m.amount)}',
                             textAlign: TextAlign.end,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -496,10 +673,23 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _buildTopExpensiveCard() {    final sorted = [..._active]
-      ..sort((a, b) => b.monthlyEquivalent.compareTo(a.monthlyEquivalent));
+  Widget _buildTopExpensiveCard() {
+    final sorted = [..._active]
+      ..sort((a, b) {
+        final pa = CurrencyConverter.convert(
+          a.monthlyEquivalent,
+          a.currency,
+          _displayCurrency,
+        );
+        final pb = CurrencyConverter.convert(
+          b.monthlyEquivalent,
+          b.currency,
+          _displayCurrency,
+        );
+        return pb.compareTo(pa);
+      });
     final top = sorted.take(3).toList();
-    final symbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
+    final displaySymbol = CurrencyConverter.symbols[_displayCurrency] ?? '';
 
     return _sectionCard(
       title: 'En Pahalı Abonelikler',
@@ -527,8 +717,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       top[i].billingCycle == 'yearly' ? 'Yıllık' : 'Aylık',
                     ),
                     trailing: Text(
-                      '$symbol${top[i].price.toStringAsFixed(2)} '
-                      '${top[i].currency}/ay',
+                      '$displaySymbol'
+                      '${_amountFormat.format(CurrencyConverter.convert(top[i].monthlyEquivalent, top[i].currency, _displayCurrency))} '
+                      '$_displayCurrency/ay',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

@@ -42,26 +42,41 @@ class Subscription {
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+  /// Hedef ayın gün sayısını aşan günleri (örn. 31 Ocak -> 28/29 Şubat)
+  /// taşma yapmadan ayın son gününe sabitler.
+  static DateTime clampedDate(int year, int month, int day) {
+    final firstOfTarget = DateTime(year, month, 1);
+    final lastDayOfMonth =
+        DateTime(firstOfTarget.year, firstOfTarget.month + 1, 0).day;
+    final clampedDay = day > lastDayOfMonth ? lastDayOfMonth : day;
+    return DateTime(firstOfTarget.year, firstOfTarget.month, clampedDay);
+  }
+
   /// Bugün ya da bugünden sonra gerçekleşecek bir sonraki yenileme tarihi.
-  DateTime get nextRenewalDate {
-    final today = _dateOnly(DateTime.now());
+  DateTime get nextRenewalDate => nextRenewalDateFrom(DateTime.now());
+
+  /// [reference] tarihine göre bir sonraki yenileme tarihi (test edilebilir).
+  DateTime nextRenewalDateFrom(DateTime reference) {
+    final today = _dateOnly(reference);
     final start = _dateOnly(startDate);
 
     if (billingCycle == 'yearly') {
       var years = today.year - start.year;
       if (years < 0) years = 0;
-      var next = DateTime(start.year + years, start.month, start.day);
+      var next = clampedDate(start.year + years, start.month, start.day);
       while (next.isBefore(today)) {
-        next = DateTime(next.year + 1, next.month, next.day);
+        years++;
+        next = clampedDate(start.year + years, start.month, start.day);
       }
       return next;
     }
 
     var months = (today.year - start.year) * 12 + (today.month - start.month);
     if (months < 0) months = 0;
-    var next = DateTime(start.year, start.month + months, start.day);
+    var next = clampedDate(start.year, start.month + months, start.day);
     while (next.isBefore(today)) {
-      next = DateTime(next.year, next.month + 1, next.day);
+      months++;
+      next = clampedDate(start.year, start.month + months, start.day);
     }
     return next;
   }

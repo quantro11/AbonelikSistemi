@@ -1,157 +1,112 @@
-# Abonelik Yöneticisi (Subscription Manager)
+# Abonelik Yöneticisi (`AbonelikSistemi` v2.0)
 
-Tamamen **çevrimdışı (offline)** çalışan, sunucu gerektirmeyen Kişisel Finans ve
-Abonelik Yönetimi uygulaması. Netflix, Spotify gibi aylık/yıllık abonelikleri
-takip eder, aylık toplam gideri hesaplar ve yenilenmesine 3 gün veya daha az
-kalan abonelikler için **sabah 09:00**'da yerel bildirim gönderir.
+[![Build & Release](https://github.com/quantro11/AbonelikSistemi/actions/workflows/build-apk.yml/badge.svg)](https://github.com/quantro11/AbonelikSistemi/actions/workflows/build-apk.yml)
+[![Latest Release](https://img.shields.io/github/v/release/quantro11/AbonelikSistemi?label=S%C3%BCr%C3%BCm)](https://github.com/quantro11/AbonelikSistemi/releases/latest)
+[![License: AGPL v3](https://img.shields.io/badge/Lisans-AGPL--3.0-blue.svg)](LICENSE)
+[![Offline First](https://img.shields.io/badge/%C3%87evrimd%C4%B1%C5%9F%C4%B1-%25100%20Yerel-22c55e.svg)](PRIVACY_POLICY.md)
 
-## Özellikler
+Tamamen **çevrimdışı (offline)**, sunucusuz, reklamsız ve gizlilik öncelikli **Kişisel Finans ve Abonelik Yönetimi** uygulaması (Flutter + SQLite).  
+Paket kimliği: `com.quantro.subscription_manager`
 
-- **Dashboard**: En üstte büyük puntolarla "Aylık Toplam Gider", altında
-  tarihe göre sıralı yaklaşan ödemeler; **arama**, kategoriye göre filtreleme,
-  **aylık bütçe aşımı uyarısı**, bildirim izni kapalıyken hatırlatma banner'ı;
-  iptal, iptali geri alma, silme, **düzenleme** ve **detay** ekranı.
-- **Abonelik Ekle / Düzenle**: Uygulama adı, fiyat, para birimi (TRY/USD/EUR),
-  fatura döngüsü (aylık/yıllık), kategori, ilk ödeme tarihi, hatırlatma günü
-  (1/3/7) ve opsiyonel deneme süresi.
-- **Detay ekranı**: Aboneliğin tüm bilgileri, sonraki yenileme tarihi ve
-  **ödeme geçmişi** (ödeme ekle/sil, tutar + not).
-- **İstatistikler**: Aylık/yıllık toplam, önümüzdeki 7 gündeki ödemeler,
-  kategoriye göre donut grafik ve en pahalı abonelikler.
-- **Ayarlar**: Açık/koyu/sistem teması, görüntüleme para birimi, **aylık
-  bütçe**, bildirim aç/kapa, bildirim saati, **JSON yedek al / geri yükle**
-  (değiştir veya birleştir), **CSV dışa aktarma** ve **takvime aktarma (.ics)**.
-- **Bildirimler**: Yenilenmesine 3 gün veya daha az kalan abonelikler için
-  günlük uyarı + **bitmesine 3 gün veya daha az kalan deneme süreleri** için
-  uyarı (varsayılan 09:00, ayarlanabilir).
-- **Veritabanı**: SQLite (sqflite) — tüm veriler cihazda, internet gerektirmez.
-- **Arka plan**: flutter_background_service ile uygulama kapalıyken de
-  periyodik kontrol; flutter_local_notifications ile bildirim.
-- **Görsel**: Material 3 uyumlu arayüz, uygulama ikonu ve açılış ekranı
-  (splash), boş durum ekranları.
+> **Hemen İndir (Android APK):** [Son Sürüm APK & AAB İndirme Sayfası](https://github.com/quantro11/AbonelikSistemi/releases/latest)  
+> **Gizlilik Politikası:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md) • **Yayınlama Rehberi:** [docs/RELEASE_GUIDE.md](docs/RELEASE_GUIDE.md) • **Değişiklik Günlüğü:** [CHANGELOG.md](CHANGELOG.md)
 
-## Kurulum
+---
 
-1. Flutter SDK (3.16+) kurulu olduğundan emin olun:
-   ```bash
-   flutter --version
-   ```
-2. Boş bir Flutter iskeleti oluşturun (gerekli gradle/ios dosyalarını üretir):
-   ```bash
-   mkdir subscription_manager && cd subscription_manager
-   flutter create --org com.anomalyco --project-name subscription_manager .
-   ```
-3. Bu klasördeki `pubspec.yaml` ve `lib/` klasörünü projenin üzerine
-   kopyalayın; `android/app/src/main/AndroidManifest.xml` dosyasını da
-   bu projedeki haliyle değiştirin.
-4. Bağımlılıkları çekip analiz edin:
-   ```bash
-   flutter pub get
-   flutter analyze
-   ```
-5. Cihazda çalıştırın (Android önerilir):
-   ```bash
-   flutter run
-   ```
+## Özellikler (`v2.0.0`)
 
-> **Not:** `AndroidManifest.xml` dosyasındaki izinler ve
-> `BackgroundService` servis kaydı arka plan servisinin çalışması için
-> zorunludur; dosyayı olduğu gibi kullanın.
+| Modül | Özellikler |
+| :--- | :--- |
+| **Ana Ekran (Dashboard)** | Büyük puntolu aylık toplam gider, aylık bütçe ilerleme çubuğu ve aşım uyarısı, arama, kategori filtreleri, **sıralama (Yaklaşan / En Pahalı / A–Z)**, iptal/geri alma ve bildirim izin banner'ı. |
+| **Tek Dokunuşla Şablonlar** | Netflix, Spotify, YouTube Premium, Amazon Prime, Disney+, iCloud+, Google One, ChatGPT Plus, Claude Pro, GitHub Copilot, Xbox Game Pass ve daha fazlası dahil **16 hazır servis şablonu**. |
+| **4 Haneli PIN Kilidi** | Cihaz içi rastgele tuzlu **SHA-256** özetleme, 5 hatalı denemede 30 sn koruma kilidi ve arka planda 30 sn sonra otomatik yeniden kilitleme. |
+| **Zam Analizi & Fiyat Geçmişi** | Her fiyat değişikliği otomatik kaydedilir; detayda çizgi grafik + `(+%X)` değişim etiketleri, istatistiklerde **Zam Alan Abonelikler** ve yıllık ek maliyet özeti. |
+| **12 Aylık Ödeme Projeksiyonu** | Yıllık aboneliklerin yenilendiği yoğun ayları önceden gösteren 12 aylık gerçek nakit çıkışı analizi. |
+| **İstatistikler** | Aylık/yıllık toplam, önümüzdeki 7 gün gerçek fatura tutarı, kategori donut grafiği, son 6 ay gerçek ödeme geçmişi ve kur dönüşümlü en pahalı abonelikler. |
+| **Yenileme Takvimi & Widget** | Ay sonu taşmasız (31 Ocak → 28/29 Şubat) interaktif yenileme takvimi + **Android ana ekran widget'ı** (`SubscriptionWidgetProvider.kt`). |
+| **Akıllı Yerel Bildirimler** | Her aboneliğin kendi **hatırlatma gününe (1/3/7 gün önce)** göre günlük kontrol + ücretsiz deneme bitiş uyarısı + bildirime dokununca derin bağlantı. |
+| **Tam Veri Taşınabilirliği** | **JSON v2 tam yedekleme** (abonelikler + ödemeler + fiyat geçmişi; değiştir/birleştir), **CSV içe/dışa aktarma**, **Takvim (.ics) dışa aktarma** ve çevrimdışı özel döviz kurları (TRY / USD / EUR). |
 
-## Nasıl çalışıyor (arka plan akışı)
+---
 
-1. Uygulama açılırken `NotificationService.init()` bildirim kanallarını ve
-   izinleri kurar.
-2. Bildirimler açıksa `configureAndStartBackgroundService()` cihazda bir
-   arka plan servisi başlatır (uygulama kapalıyken de çalışır,
-   `autoStartOnBoot` ile cihaz açılışında da yeniden başlar).
-3. Servis her 30 dakikada bir `performDailyCheck()` çalıştırır. Bu fonksiyon:
-   - Ayarlarda seçili "bildirim saati" (varsayılan 09:00) gelmediyse çıkar,
-   - Günde yalnızca **bir kez** kontrol yapar,
-   - Yenilenmesine **3 gün veya daha az** kalmış abonelikleri bulur,
-   - Her biri için "Dikkat: [Abonelik] yenilemesine az kaldı!" bildirimini
-     atar ve aynı gün tekrar bildirim atmamak için `last_notified_date`
-     kolonunu günceller.
-   - Bitmesine **3 gün veya daha az** kalan aktif deneme süreleri için
-     "Deneme Süresi Uyarısı" bildirimi atar (günde bir kez, ayrı anahtarla
-     takip edilir).
+## Proje Yapısı
 
-## Testler
+```text
+AbonelikSistemi/
+├── lib/
+│   ├── main.dart                         # Uygulama başlangıcı, tema, kur ve PIN kilidi kapısı
+│   ├── app_info.dart                     # Sürüm (2.0.0), paket kimliği ve uygulama meta verisi
+│   ├── app_navigation.dart               # Bildirim derin bağlantı yönlendiricisi
+│   ├── database/app_database.dart        # SQLite şeması (v5), CRUD, hatırlatma & fiyat geçmişi sorguları
+│   ├── models/
+│   │   ├── subscription.dart             # Yenileme hesabı (ay sonu güvenli) ve CurrencyConverter
+│   │   ├── popular_templates.dart        # 16 popüler servis hızlı ekleme şablonu
+│   │   ├── payment.dart                  # Ödeme geçmişi modeli
+│   │   ├── price_history.dart            # Fiyat değişim geçmişi modeli
+│   │   └── categories.dart               # Kategori renk ve ikon kataloğu
+│   ├── screens/
+│   │   ├── dashboard_screen.dart         # Ana ekran, bütçe, arama, sıralama ve filtreleme
+│   │   ├── add_subscription_screen.dart  # Ekle/düzenle formu + hızlı şablon çubuğu
+│   │   ├── subscription_detail_screen.dart # Detay, fiyat grafiği (% değişim) ve ödemeler
+│   │   ├── insights_screen.dart          # Zam analizi, 12 aylık projeksiyon, donut ve harcama
+│   │   ├── calendar_screen.dart          # Aylık yenileme takvimi
+│   │   ├── settings_screen.dart          # Tema, kur, PIN kilidi, bütçe, bildirim ve yedekleme
+│   │   └── pin_lock_screen.dart          # 4 haneli PIN giriş/kurulum/kaldırma ekranı
+│   ├── services/
+│   │   ├── notification_service.dart     # Yerel bildirimler ve arka plan servisi
+│   │   ├── pin_lock_service.dart         # Tuzlu SHA-256 PIN doğrulama ve kilitleme
+│   │   ├── analytics_service.dart        # Zam tespiti ve 12 aylık nakit projeksiyonu
+│   │   ├── export_service.dart           # JSON v2, CSV ve ICS içe/dışa aktarma
+│   │   └── widget_service.dart           # Android App Widget köprüsü
+│   ├── theme/theme_controller.dart       # Açık/koyu/sistem tema yöneticisi
+│   └── widgets/empty_state.dart          # Ortak boş durum bileşeni
+├── android/                              # Manifest, uygulama ikonları, splash ve Kotlin App Widget
+├── test/                                 # 8 kapsamlı birim test dosyası (SQLite FFI, PIN, Analiz, Export)
+├── docs/                                 # Tanıtım/indirme sitesi (index.html, privacy.html) ve Yayın Rehberi
+├── .github/workflows/                    # Sıkı CI: analyze + test + Release APK & Play Store AAB
+├── PRIVACY_POLICY.md                     # Türkçe + İngilizce Gizlilik Politikası
+└── CHANGELOG.md                          # Sürüm geçmişi
+```
 
-Model, döviz çevirimi ve veritabanı CRUD mantığı `test/` altında birim
-testleriyle doğrulanır. Veritabanı testleri `sqflite_common_ffi` ile
-masaüstünde çalışır; cihaz/emülatör gerekmez.
+---
+
+## Geliştirici Kurulumu ve Test
 
 ```bash
+# 1. Depoyu klonlayın
+git clone https://github.com/quantro11/AbonelikSistemi.git
+cd AbonelikSistemi
+
+# 2. Android platform dosyalarını oluşturun (mevcut özelleştirmeler korunur)
+flutter create --org com.quantro --project-name subscription_manager --platforms=android .
+rm -f test/widget_test.dart
+
+# 3. Bağımlılıkları yükleyin, statik analiz ve tüm testleri çalıştırın
+flutter pub get
+flutter analyze
 flutter test
+
+# 4. Android cihazda çalıştırın veya Release APK / AAB üretin
+flutter run
+flutter build apk --release
+flutter build appbundle --release
 ```
 
-CI (`.github/workflows/build-apk.yml`) `flutter analyze` ve `flutter test`
-adımlarını çalıştırır; hatalar GitHub Actions'da annotation olarak görünür.
+> **Android Arka Plan Notu:** `AndroidManifest.xml` içindeki `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` ve `FOREGROUND_SERVICE_DATA_SYNC` izinleri yalnızca yerel yenileme bildirimleri içindir. Kesintisiz arka plan hatırlatması için cihaz pil ayarlarından uygulamanın pil optimizasyonundan muaf tutulması önerilir.
 
-## Yayınlama (APK indirme)
+---
 
-Bu proje `.github/workflows/build-apk.yml` dosyasıyla **GitHub Actions** üzerinde
-APK derleyip indirilebilir hale getirir (yerel Flutter/Android SDK gerekmez):
+## Otomatik Derleme ve Yayınlama (CI/CD)
 
-1. Repo'yu GitHub'a push edin.
-2. Bir sürüm etiketi atın:
-   ```bash
-   git tag v1.0.0 && git push origin v1.0.0
-   ```
-3. GitHub'daki **Actions** sekmesinde build tamamlanınca:
-   - Etiketli sürümlerde **Releases** sayfasında
-     `subscription_manager-v1.0.0.zip` (içinde `app-release.apk` + tüm kaynak)
-     otomatik oluşur → oradan indirin.
-   - Etiketsiz (manuel "Run workflow") çalıştırmalarda zip, işin
-     **Artifacts** bölümünden indirilebilir.
+Her `main` güncellemesinde ve `v*` etiketinde GitHub Actions otomatik olarak:
+1. `flutter analyze` (sıfır hata/uyarı) çalıştırır,
+2. `flutter test` tüm birim testlerini geçirir,
+3. Release **`.apk`** + Google Play **`.aab`** + **`.zip`** + **`SHA256SUMS.txt`** paketlerini üretir.
 
-## Platform notları
+Play Store üretim keystore imzalama ve GitHub Pages canlı site kurulumu için bkz. [docs/RELEASE_GUIDE.md](docs/RELEASE_GUIDE.md).
 
-- **Android**: Arka plan servisi en iyi şekilde çalışır. Kesintisiz kontrol
-  için uygulamayı **pil optimizasyonundan muaf** tutmanız önerilir
-  (Ayarlar → Pil → Pil optimizasyonu → Abonelik Yöneticisi → İzin verme).
-- **iOS**: flutter_background_service iOS'ta kısıtlıdır; tam arka plan
-  yürütme için BGTaskScheduler ile ek yapılandırma gerekebilir.
-  Bildirim izni ilk açılışta sorulur.
+---
 
-## Teknik mimari
+## Lisans
 
-```
-lib/
-├── main.dart                  → uygulama girişi, tema + servis kurulumu
-├── models/
-│   ├── subscription.dart      → Subscription modeli + CurrencyConverter
-│   ├── categories.dart        → kategori kataloğu (ad, simge, renk)
-│   └── payment.dart           → ödeme geçmişi kaydı
-├── database/
-│   └── app_database.dart      → SQLite CRUD + aylık toplam hesapları
-├── services/
-│   ├── notification_service.dart → yerel bildirimler + arka plan servisi
-│   └── export_service.dart    → CSV/JSON/ICS dışa aktarma + geri yükleme
-├── theme/
-│   └── theme_controller.dart  → açık/koyu/sistem teması yönetimi
-├── widgets/
-│   └── empty_state.dart       → boş durum ekranı bileşeni
-└── screens/
-    ├── dashboard_screen.dart
-    ├── add_subscription_screen.dart  → ekle + düzenleme
-    ├── subscription_detail_screen.dart → detay + ödeme geçmişi
-    ├── insights_screen.dart
-    └── settings_screen.dart
-```
-
-## Bağımlılıklar
-
-| Paket | Amaç |
-|---|---|
-| `sqflite` | Yerel SQLite veritabanı |
-| `shared_preferences` | Ayarların ve tema tercihinin saklanması |
-| `flutter_local_notifications` | Yerel bildirimler |
-| `flutter_background_service` | Uygulama kapalıyken arka plan kontrolü |
-| `intl` | Tarih / para formatlama |
-| `path` | Veritabanı yolu birleştirme |
-| `path_provider` | Dışa aktarma dosyaları için uygulama klasörü |
-| `share_plus` | Dosyaları paylaşma / indirme menüsü |
-| `file_picker` | Yedek geri yüklemede JSON dosyası seçme |
-| `sqflite_common_ffi` (dev) | Veritabanı testlerini masaüstünde çalıştırma |
+Bu proje **GNU Affero General Public License v3.0 (AGPL-3.0)** ile lisanslanmıştır — bkz. [LICENSE](LICENSE).

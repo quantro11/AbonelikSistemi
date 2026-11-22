@@ -278,4 +278,44 @@ void main() {
     await db.deleteSubscription(id);
     expect(await db.getPriceHistoryForSubscription(id), isEmpty);
   });
+
+  test('getSubscriptionsDueForReminder her aboneliğin reminderDays ayarını kullanır',
+      () async {
+    final db = AppDatabase.instance;
+    final now = DateTime.now();
+    final inFiveDays = DateTime(now.year, now.month, now.day + 5);
+
+    // 7 gün önce uyar -> 5 gün kaldığı için dahil edilmeli
+    await db.insertSubscription(Subscription(
+      name: 'Erken Hatırlatma',
+      price: 100,
+      currency: 'TRY',
+      billingCycle: 'monthly',
+      startDate: inFiveDays,
+      reminderDays: 7,
+    ));
+    // 3 gün önce uyar -> 5 gün kaldığı için henüz dahil edilmemeli
+    await db.insertSubscription(Subscription(
+      name: 'Standart Hatırlatma',
+      price: 100,
+      currency: 'TRY',
+      billingCycle: 'monthly',
+      startDate: inFiveDays,
+      reminderDays: 3,
+    ));
+
+    final due = await db.getSubscriptionsDueForReminder();
+    expect(due, hasLength(1));
+    expect(due.single.name, 'Erken Hatırlatma');
+  });
+
+  test('getAllPriceHistory tüm aboneliklerin fiyat geçmişini döndürür', () async {
+    final db = AppDatabase.instance;
+    final id1 = await db.insertSubscription(makeSub(name: 'A', price: 100));
+    await db.updateSubscription(makeSub(id: id1, name: 'A', price: 150));
+    await db.insertSubscription(makeSub(name: 'B', price: 50));
+
+    final allHistory = await db.getAllPriceHistory();
+    expect(allHistory, hasLength(3));
+  });
 }

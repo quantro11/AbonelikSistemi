@@ -180,9 +180,9 @@ class NotificationService {
   // ---------- Günlük kontrol ----------
 
   /// Sabah [alertHour] (varsayılan 09:00) saatinden sonra günde yalnızca
-  /// bir kez çalışır; yenilenmesine 3 gün veya daha az kalmış abonelikler
-  /// ve bitmesine 3 gün veya daha az kalan deneme süreleri için bildirim
-  /// gönderir.
+  /// bir kez çalışır; her aboneliğin kendi [Subscription.reminderDays] ayarına
+  /// göre yaklaşan yenilemeler ve bitmesine 3 gün veya daha az kalan deneme
+  /// süreleri için bildirim gönderir.
   static Future<void> performDailyCheck() async {
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool('notifications_enabled') ?? true)) return;
@@ -196,7 +196,7 @@ class NotificationService {
     if (now.hour < alertHour || (prefs.getBool(todayKey) ?? false)) return;
     await prefs.setBool(todayKey, true);
 
-    final due = await AppDatabase.instance.getUpcomingRenewals(3);
+    final due = await AppDatabase.instance.getSubscriptionsDueForReminder();
     for (final subscription in due) {
       final lastNotified = subscription.lastNotifiedDate;
       final alreadyNotifiedToday = lastNotified != null &&

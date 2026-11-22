@@ -1,15 +1,17 @@
-name: APK Build & Release
+name: APK & AAB Build + Release
 
 # Tetikleyiciler:
-# 1) `git tag v1.0.0` + push  -> APK derlenir, "Release" sayfası oluşturulur,
-#    .zip (kaynak + APK) release'e eklenir. Release sayfası indirme sitesidir.
-# 2) Manual "Run workflow"     -> APK derlenir, zip Actions artifact'ı olarak
-#    indirilebilir (Release oluşturulmaz).
+# 1) `git push` (main)       -> flutter analyze, flutter test, Release APK & AAB derler (artifact olarak yukler).
+# 2) `git tag v2.0.0` + push -> Her seyi dogrular, APK + AAB + ZIP + SHA256SUMS ile GitHub Release olusturur.
+# 3) Manual "Run workflow"   -> Istege bagli elle derleme.
 
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'main'
+  pull_request:
     branches:
       - 'main'
   workflow_dispatch:
@@ -19,9 +21,11 @@ permissions:
 
 env:
   APP_NAME: subscription_manager
+  APK_PREFIX: abonelik-yoneticisi
 
 jobs:
   build:
+    name: Analyze, Test & Build (APK + AAB)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -46,130 +50,175 @@ jobs:
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
           fi
 
-      # lib/ ve pubspec.yaml hazır olduğu için eksik platform klasörlerini
-      # (android/, ios/, vb.) CI'da üretiyoruz. Var olan dosyalar korunur.
-      - name: Generate platform folders
+      # lib/, test/ ve pubspec.yaml hazir oldugu icin eksik platform dosyalarini
+      # (gradle, MainActivity.kt vb.) CI'da uretiyoruz. Var olan dosyalar korunur.
+      - name: Generate Android platform scaffolding (com.quantro.subscription_manager)
         run: |
-          flutter create --org com.anomalyco .
+          flutter create --org com.quantro --project-name subscription_manager --platforms=android .
           rm -f test/widget_test.dart
 
-      - name: Enable core library desugaring (flutter_local_notifications)
-        continue-on-error: true
+      - name: Configure core library desugaring & optional release signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          python3 - <<'PY' 2>&1 | tee desugar.log
-          import os, re
+          python3 - <<'PY'
+          import base64, os, re
+
           p = 'android/app/build.gradle'
           if not os.path.exists(p):
               p = 'android/app/build.gradle.kts'
-          s = open(p).read()
+          assert os.path.exists(p), 'Android app build.gradle(.kts) bulunamadi'
+          s = open(p, encoding='utf-8').read()
+
+          # 1) Core library desugaring (flutter_local_notifications icin zorunlu)
           if p.endswith('.kts'):
               if 'isCoreLibraryDesugaringEnabled' not in s:
-                  s = s.replace('compileOptions {', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', 1)
+                  s = s.replace(
+                      'compileOptions {',
+                      'compileOptions {\n        isCoreLibraryDesugaringEnabled = true',
+                      1,
+                  )
               if 'coreLibraryDesugaring' not in s:
                   s += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
           else:
               if 'isCoreLibraryDesugaringEnabled' not in s and 'coreLibraryDesugaringEnabled' not in s:
                   if 'compileOptions {' in s:
-                      s = s.replace('compileOptions {', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', 1)
+                      s = s.replace(
+                          'compileOptions {',
+                          'compileOptions {\n        coreLibraryDesugaringEnabled true',
+                          1,
+                      )
                   else:
-                      s = s.replace('android {', 'android {\n    compileOptions {\n        isCoreLibraryDesugaringEnabled = true\n    }', 1)
-              else:
-                  s = re.sub(r'isCoreLibraryDesugaringEnabled\s*=\s*(true|false)', 'isCoreLibraryDesugaringEnabled = true', s)
-                  s = re.sub(r'coreLibraryDesugaringEnabled\s+(true|false)', 'coreLibraryDesugaringEnabled true', s)
+                      s = s.replace(
+                          'android {',
+                          'android {\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n    }',
+                          1,
+                      )
               if 'desugar_jdk_libs' not in s:
                   if 'dependencies {' in s:
-                      s = s.replace('dependencies {', 'dependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"', 1)
+                      s = s.replace(
+                          'dependencies {',
+                          'dependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"',
+                          1,
+                      )
                   else:
                       s += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n}\n'
-          open(p, 'w').write(s)
-          print('patched:', p)
-          PY
-          exit ${PIPESTATUS[0]}
 
-      - name: Emit desugaring log as annotations
-        run: |
-          if [ -s desugar.log ]; then
-            tail -50 desugar.log | tac | while IFS= read -r line; do
-              echo "::error file=desugar.log::$line"
-            done
-          fi
+          # 2) Opsiyonel Play Store keystore imzalama (4 GitHub Secret tanimliysa)
+          ks_b64 = os.environ.get('KEYSTORE_B64', '').strip()
+          ks_pass = os.environ.get('KEYSTORE_PASS', '').strip()
+          key_alias = os.environ.get('KEY_ALIAS', '').strip()
+          key_pass = os.environ.get('KEY_PASS', '').strip()
+
+          if ks_b64 and ks_pass and key_alias and key_pass:
+              with open('android/app/upload-keystore.jks', 'wb') as f:
+                  f.write(base64.b64decode(ks_b64))
+              with open('android/key.properties', 'w', encoding='utf-8') as f:
+                  f.write(
+                      f'storePassword={ks_pass}\n'
+                      f'keyPassword={key_pass}\n'
+                      f'keyAlias={key_alias}\n'
+                      f'storeFile=upload-keystore.jks\n'
+                  )
+              if p.endswith('.kts'):
+                  header = (
+                      'import java.util.Properties\n'
+                      'import java.io.FileInputStream\n'
+                      'val keystoreProperties = Properties()\n'
+                      'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+                      'if (keystorePropertiesFile.exists()) {\n'
+                      '    keystoreProperties.load(FileInputStream(keystorePropertiesFile))\n'
+                      '}\n\n'
+                  )
+                  s = header + s
+                  signing_block = (
+                      '    signingConfigs {\n'
+                      '        create("release") {\n'
+                      '            keyAlias = keystoreProperties.getProperty("keyAlias")\n'
+                      '            keyPassword = keystoreProperties.getProperty("keyPassword")\n'
+                      '            storeFile = file(keystoreProperties.getProperty("storeFile"))\n'
+                      '            storePassword = keystoreProperties.getProperty("storePassword")\n'
+                      '        }\n'
+                      '    }\n'
+                      '    buildTypes {'
+                  )
+                  s = s.replace('    buildTypes {', signing_block, 1)
+                  s = s.replace(
+                      'signingConfig = signingConfigs.getByName("debug")',
+                      'signingConfig = signingConfigs.getByName("release")',
+                  )
+              print('Production release signing configured via GitHub Secrets.')
+          else:
+              print('Release keystore secrets not set; building with default signing config (see docs/RELEASE_GUIDE.md).')
+
+          with open(p, 'w', encoding='utf-8') as f:
+              f.write(s)
+          print('Patched successfully:', p)
+          PY
 
       - name: Fetch dependencies
         run: flutter pub get
 
       # file_picker 8.x android/build.gradle'da compileSdk 34'u hardcode eder;
-      # flutter_plugin_android_lifecycle (flutter.compileSdkVersion=36) ile
-      # checkReleaseAarMetadata hatasina yol acar. 36'ya yukseltiyoruz.
-      - name: Patch file_picker compileSdk (hardcoded 34 -> 36)
+      # flutter_plugin_android_lifecycle ile checkReleaseAarMetadata hatasini onler.
+      - name: Patch file_picker compileSdk (34 -> 36)
         run: |
           set -e
           FP_DIR=$(ls -d "$HOME/.pub-cache/hosted/pub.dev"/file_picker-* 2>/dev/null | sort -V | tail -1)
           FP="$FP_DIR/android/build.gradle"
-          echo "Patching $FP"
-          sed -i 's/compileSdk 34/compileSdk 36/' "$FP"
-          grep -n "compileSdk" "$FP"
-
-      - name: Analyze
-        continue-on-error: true
-        run: flutter analyze 2>&1 | tee analyze.log
-
-      - name: Emit analyze errors as annotations
-        run: |
-          if [ -s analyze.log ]; then
-            grep -E "(error|warning|info) •" analyze.log | while IFS= read -r line; do
-              echo "::error file=analyze.log::$line"
-            done
+          if [ -f "$FP" ]; then
+            sed -i 's/compileSdk 34/compileSdk 36/' "$FP"
+            grep -n "compileSdk" "$FP"
           fi
 
-      - name: Run tests
-        continue-on-error: true
-        run: flutter test 2>&1 | tee test.log
+      - name: Static analysis (flutter analyze)
+        run: flutter analyze
 
-      - name: Emit test errors as annotations
-        run: |
-          if [ -s test.log ]; then
-            grep -E "\[E\]" test.log | head -30 | while IFS= read -r line; do
-              echo "::error file=test.log::$line"
-            done
-          fi
+      - name: Unit tests (flutter test)
+        run: flutter test --reporter expanded
 
-      - name: Build release APK
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          flutter build apk --release 2>&1 | tee build.log
+      - name: Build Release APK
+        run: flutter build apk --release
 
-      - name: Emit build errors as annotations
-        run: |
-          if [ -s build.log ]; then
-            grep -B1 -A25 "What went wrong" build.log | tail -30 | while IFS= read -r line; do
-              echo "::error file=build.log::$line"
-            done
-          fi
+      - name: Build Play Store App Bundle (AAB)
+        run: flutter build appbundle --release
 
-      - name: Package zip (project + APK)
+      - name: Package release artifacts (APK, AAB, ZIP, SHA256SUMS)
         run: |
           set -e
-          cp build/app/outputs/flutter-apk/app-release.apk ./app-release.apk
-          VERSION="${GITHUB_REF_NAME:-manual}"
-          ZIP_NAME="${APP_NAME}-${VERSION}.zip"
-          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
-          zip -r "${ZIP_NAME}" \
-            app-release.apk \
-            lib pubspec.yaml README.md \
-            android -x "android/build/*" "android/app/build/*" "android/.gradle/*"
-          ls -lh "${ZIP_NAME}"
+          mkdir -p release-assets
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          APK_FILE="release-assets/${APK_PREFIX}-${VERSION}.apk"
+          AAB_FILE="release-assets/${APK_PREFIX}-${VERSION}.aab"
+          ZIP_FILE="release-assets/${APP_NAME}-${VERSION}.zip"
 
-      - name: Upload artifact
+          cp build/app/outputs/flutter-apk/app-release.apk "${APK_FILE}"
+          cp build/app/outputs/bundle/release/app-release.aab "${AAB_FILE}"
+          cp build/app/outputs/flutter-apk/app-release.apk ./app-release.apk
+
+          zip -rq "${ZIP_FILE}" \
+            app-release.apk \
+            lib test pubspec.yaml README.md PRIVACY_POLICY.md LICENSE \
+            android -x "android/build/*" "android/app/build/*" "android/.gradle/*" "android/key.properties" "android/app/upload-keystore.jks"
+          rm -f ./app-release.apk
+
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+          ls -lh release-assets/
+          cat release-assets/SHA256SUMS.txt
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_NAME }}
+          name: abonelik-yoneticisi-${{ github.ref_name }}
+          path: release-assets/
           if-no-files-found: error
 
-      - name: Create GitHub Release (only on tag)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create GitHub Release (on v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_NAME }}
+          files: release-assets/*
           generate_release_notes: true

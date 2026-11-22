@@ -55,13 +55,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (s.billingCycle == 'yearly') {
       for (var y = s.startDate.year; ; y++) {
-        final d = DateTime(y, s.startDate.month, s.startDate.day);
+        final d = Subscription.clampedDate(y, s.startDate.month, s.startDate.day);
         if (d.isAfter(lastDay)) break;
         if (!d.isBefore(firstOfMonth) && !d.isBefore(todayOnly)) result.add(d);
       }
     } else {
       for (var months = 0; ; months++) {
-        final d = DateTime(
+        final d = Subscription.clampedDate(
           s.startDate.year,
           s.startDate.month + months,
           s.startDate.day,
@@ -104,7 +104,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
             Text(
-              '${day} ${_trMonths[_visibleMonth.month - 1]} — Yenilemeler',
+              '$day ${_trMonths[_visibleMonth.month - 1]} — Yenilemeler',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),

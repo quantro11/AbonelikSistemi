@@ -8,8 +8,10 @@ import '../app_info.dart';
 import '../models/subscription.dart';
 import '../services/export_service.dart';
 import '../services/notification_service.dart';
+import '../services/pin_lock_service.dart';
 import '../services/widget_service.dart';
 import '../theme/theme_controller.dart';
+import 'pin_lock_screen.dart';
 
 /// Ayarlar: tema, para birimi, bütçe, bildirimler ve veri yönetimi.
 class SettingsScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _alertHour = 9;
   ThemeMode _themeMode = ThemeMode.system;
   double _monthlyBudget = 0;
+  bool _pinEnabled = false;
   bool _loading = true;
   bool _exporting = false;
 
@@ -36,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    final pinEnabled = await PinLockService.isEnabled();
     if (!mounted) return;
     setState(() {
       _currency = prefs.getString('display_currency') ?? 'TRY';
@@ -44,8 +48,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _alertHour = prefs.getInt('alert_hour') ?? 9;
       _themeMode = ThemeController.instance.value;
       _monthlyBudget = prefs.getDouble('monthly_budget') ?? 0;
+      _pinEnabled = pinEnabled;
       _loading = false;
     });
+  }
+
+  Future<void> _togglePinLock(bool enable) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PinLockScreen(
+          mode: enable ? PinLockMode.setup : PinLockMode.disable,
+        ),
+      ),
+    );
+    if (changed != true || !mounted) return;
+    final enabled = await PinLockService.isEnabled();
+    if (!mounted) return;
+    setState(() => _pinEnabled = enabled);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          enabled
+              ? '4 haneli PIN kilidi etkinleştirildi.'
+              : 'PIN kilidi kaldırıldı.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changePin() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const PinLockScreen(mode: PinLockMode.setup),
+      ),
+    );
+    if (changed != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('PIN kodu güncellendi.')),
+    );
   }
 
   Future<void> _setCurrency(String currency) async {
@@ -117,8 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Yedeği Geri Yükle'),
         content: Text(
-          'Yedekte ${data!.subscriptions.length} abonelik ve '
-          '${data.payments.length} ödeme var.\n\n'
+          'Yedekte ${data!.subscriptions.length} abonelik, '
+          '${data.payments.length} ödeme'
+          '${data.priceHistory.isNotEmpty ? ' ve ${data.priceHistory.length} fiyat geçmişi kaydı' : ''} var.\n\n'
           'Değiştir: mevcut tüm veriler silinir, yedektekiler yüklenir.\n'
           'Birleştir: mevcut veriler korunur, yedektekiler eklenir.',
         ),
@@ -243,20 +284,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+    final tryText = tryController.text.trim();
+    final eurText = eurController.text.trim();
     tryController.dispose();
     eurController.dispose();
     if (saved != true || !mounted) return;
 
     await CurrencyConverter.saveRates(
-      usdToTry: double.parse(
-        tryController.text.trim().replaceAll(',', '.'),
-      ),
-      usdToEur: double.parse(
-        eurController.text.trim().replaceAll(',', '.'),
-      ),
+      usdToTry: double.parse(tryText.replaceAll(',', '.')),
+      usdToEur: double.parse(eurText.replaceAll(',', '.')),
     );
     HapticFeedback.lightImpact();
     if (!mounted) return;
+    setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Döviz kurları güncellendi.')),
     );
@@ -335,18 +375,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       applicationName: AppInfo.appName,
       applicationVersion: AppInfo.version,
+      applicationLegalese: '© ${AppInfo.developer} • AGPL-3.0',
       applicationIcon: const Icon(Icons.subscriptions_outlined, size: 40),
       children: [
         Text(AppInfo.description),
         const SizedBox(height: 12),
         const Text(
           'Özellikler:\n'
-          '• Yenileme ve deneme hatırlatmaları\n'
+          '• Tek dokunuşla popüler servis şablonları\n'
+          '• 4 haneli yerel PIN uygulama kilidi (SHA-256)\n'
+          '• Abonelik bazlı (1/3/7 gün) yenileme ve deneme hatırlatmaları\n'
+          '• Zam analizi ve 12 aylık ödeme projeksiyonu\n'
           '• Aylık bütçe uyarısı ve ilerleme çubuğu\n'
-          '• Fiyat geçmişi ve artış grafiği\n'
-          '• Yenileme takvimi ve ana ekran widget\'ı\n'
-          '• Ödeme geçmişi ve gerçek harcama analizi\n'
-          '• JSON yedekleme, CSV ve takvim (.ics) aktarımı',
+          '• Yenileme takvimi ve Android ana ekran widget\'ı\n'
+          '• JSON v2 yedekleme, CSV ve takvim (.ics) aktarımı',
         ),
       ],
     );
@@ -401,10 +443,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+    final value = controller.text.trim();
     controller.dispose();
     if (saved != true) return;
 
-    final value = controller.text.trim();
     final parsed = value.isEmpty ? 0.0 : double.parse(value.replaceAll(',', '.'));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('monthly_budget', parsed);
@@ -530,13 +572,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 28),
                 Text(
+                  'Güvenlik',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Uygulamayı yerel 4 haneli PIN koduyla koruyun.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.lock_outline),
+                        title: const Text('PIN uygulama kilidi'),
+                        subtitle: Text(
+                          _pinEnabled
+                              ? 'Açılışta ve 30 sn arka plan sonrası PIN istenir'
+                              : 'Kapalı — veriler cihazda yerel tutulur',
+                        ),
+                        value: _pinEnabled,
+                        onChanged: _togglePinLock,
+                      ),
+                      if (_pinEnabled) ...[
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.password_outlined),
+                          title: const Text('PIN kodunu değiştir'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: _changePin,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Text(
                   'Bildirimler',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Yenilenmesine 3 gün veya daha az kalan abonelikler '
-                  'için günde bir kez bildirim gönderilir.',
+                  'Her aboneliğin hatırlatma ayarına (1/3/7 gün önce) göre '
+                  'günde bir kez bildirim gönderilir.',
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                 ),
                 const SizedBox(height: 8),

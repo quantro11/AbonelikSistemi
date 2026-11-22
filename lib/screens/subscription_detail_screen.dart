@@ -62,8 +62,12 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
   }
 
   double get _totalPaid {
-    final sum = _payments.fold<double>(0, (a, p) => a + p.amount);
-    return sum;
+    final targetCurrency = _subscription?.currency ?? 'TRY';
+    return _payments.fold<double>(
+      0,
+      (sum, p) =>
+          sum + CurrencyConverter.convert(p.amount, p.currency, targetCurrency),
+    );
   }
 
   Future<bool> _confirm(
@@ -509,7 +513,13 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
     final previous = index > 0 ? history[index - 1] : null;
     final IconData? icon;
     final Color? indicator;
+    String? deltaLabel;
     if (previous != null && previous.price != entry.price) {
+      if (previous.currency == entry.currency && previous.price > 0) {
+        final pct = ((entry.price - previous.price) / previous.price) * 100;
+        final sign = pct >= 0 ? '+' : '';
+        deltaLabel = ' ($sign%${pct.toStringAsFixed(0)})';
+      }
       if (entry.price > previous.price) {
         indicator = colorScheme.error;
         icon = Icons.arrow_upward;
@@ -536,7 +546,8 @@ class _SubscriptionDetailScreenState extends State<SubscriptionDetailScreen> {
           ),
           const Spacer(),
           Text(
-            '$symbol${entry.price.toStringAsFixed(2)} ${entry.currency}',
+            '$symbol${entry.price.toStringAsFixed(2)} ${entry.currency}'
+            '${deltaLabel ?? ''}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
