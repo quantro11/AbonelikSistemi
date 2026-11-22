@@ -8,7 +8,8 @@
 Tamamen **çevrimdışı (offline)**, sunucusuz, reklamsız ve gizlilik öncelikli **Kişisel Finans ve Abonelik Yönetimi** uygulaması (Flutter + SQLite).  
 Paket kimliği: `com.quantro.subscription_manager`
 
-> **Hemen İndir (Android APK):** [Son Sürüm APK & AAB İndirme Sayfası](https://github.com/quantro11/AbonelikSistemi/releases/latest)  
+> **Android İndir (`v2.0.0`):** [Doğrudan APK & Google Play AAB Release Sayfası](https://github.com/quantro11/AbonelikSistemi/releases/latest)  
+> **Canlı Web Uygulaması (PWA):** `docs/app.html` — Android ile birebir uyumlu JSON v2 yedekleme, 16 şablon, PIN kilidi, zam analizi ve 12 aylık projeksiyon (Vercel `vercel.json` + GitHub Pages hazır)  
 > **Gizlilik Politikası:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md) • **Yayınlama Rehberi:** [docs/RELEASE_GUIDE.md](docs/RELEASE_GUIDE.md) • **Değişiklik Günlüğü:** [CHANGELOG.md](CHANGELOG.md)
 
 ---

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Abonelik Yöneticisi v2.0 — %100 Çevrimdışı Kişisel Finans</title>
   <meta name="description" content="Sunucusuz, reklamsız, %100 çevrimdışı Android abonelik takip uygulaması. Hızlı şablonlar, PIN kilidi, zam analizi, 12 aylık projeksiyon ve yenileme bildirimleri." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <meta name="theme-color" content="#3949ab" />
   <style>
     :root {
       --bg: #0b1020;
@@ -118,6 +121,7 @@
         <span class="badge" id="version-badge">v2.0.0</span>
       </div>
       <nav>
+        <a href="app.html" style="color:#818cf8;font-weight:700;">Canlı Web App</a>
         <a href="#ozellikler">Özellikler</a>
         <a href="#gizlilik">Gizlilik</a>
         <a href="privacy.html">Gizlilik Politikası</a>
@@ -135,17 +139,17 @@
             SQLite veritabanıyla takip et. Zamları yakala, bütçe aşmadan önce bildirim al.
           </p>
           <div class="cta-row">
-            <a class="btn btn-primary" id="apk-download" href="https://github.com/quantro11/AbonelikSistemi/releases/latest">
-              Android APK İndir (Ücretsiz)
+            <a class="btn btn-primary" href="app.html">
+              Tarayıcıda Hemen Kullan (Web App)
             </a>
-            <a class="btn btn-secondary" href="https://github.com/quantro11/AbonelikSistemi" target="_blank" rel="noopener">
-              Kaynak Kodu İncele
+            <a class="btn btn-secondary" id="apk-download" href="https://github.com/quantro11/AbonelikSistemi/releases/latest">
+              Android APK İndir (v2.0.0)
             </a>
           </div>
           <div class="trust-row">
-            <span>✓ İnternet & hesap gerektirmez</span>
+            <span>✓ Android APK + Kurulabilir Çevrimdışı PWA (iOS & Masaüstü)</span>
             <span>✓ 4 haneli SHA-256 PIN kilidi</span>
-            <span>✓ JSON / CSV / ICS yedek</span>
+            <span>✓ Android ↔ Web JSON v2 tam yedek uyumu</span>
           </div>
         </div>
 

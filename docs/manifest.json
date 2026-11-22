@@ -1,0 +1,25 @@
+{
+  "name": "Abonelik Yöneticisi — Kişisel Finans",
+  "short_name": "Abonelikler",
+  "description": "%100 çevrimdışı, sunucusuz abonelik takibi, zam analizi, 12 aylık ödeme projeksiyonu ve PIN kilidi.",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#3949ab",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
